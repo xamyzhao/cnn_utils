@@ -5,17 +5,22 @@ import scipy.io as sio
 from scipy.interpolate import RegularGridInterpolator, interp2d, RectBivariateSpline
 from scipy.ndimage import map_coordinates
 
+
 def augScale(I, points=None, scale_rand=None, obj_scale = 1.0, target_scale = 1.0, pad_value=None, border_color=(0,0,0) ):
 	if scale_rand is not None:
 	  scale_multiplier = scale_rand
 	else:
 	  scale_multiplier = randScale(0.8,1.2)
 
-	scale = target_scale/obj_scale * scale_multiplier
-	I_new = cv2.resize(I,(0,0),fx=scale,fy=scale)
+	if isinstance(scale_multiplier, tuple) or isinstance(scale_multiplier, list):
+		scale = target_scale/obj_scale * np.asarray(scale_multiplier)
+		I_new = cv2.resize(I,(0,0),fx=scale[0],fy=scale[1])
+	else:
+		scale = target_scale/obj_scale * scale_multiplier
+		I_new = cv2.resize(I,(0,0),fx=scale,fy=scale)
 
-	target_size = I.shape[0]
-	border_size = (target_size - I_new.shape[0], target_size - I_new.shape[1] )
+	target_size = I.shape
+	border_size = (target_size[0] - I_new.shape[0], target_size[1] - I_new.shape[1] )
 	if border_size[0] > 0:
 		I_new = cv2.copyMakeBorder(I_new, int( math.floor( border_size[0]/2.0 )), \
 																 	int(math.ceil( border_size[0]/2.0 )),0,0,\
@@ -34,6 +39,7 @@ def augScale(I, points=None, scale_rand=None, obj_scale = 1.0, target_scale = 1.
 	  points = points * scale
 	return I_new, points
 
+
 def augRotate(I, points=None, max_rot_degree=30.0, crop_size_x=None, crop_size_y=None, degree_rand=None, border_color=(0,0,0)):
 	if crop_size_x is None:
 	  crop_size_x = I.shape[1]
@@ -50,7 +56,7 @@ def augRotate(I, points=None, max_rot_degree=30.0, crop_size_x=None, crop_size_y
 
 	center = ( (w-1.0)/2.0, (h-1.0)/2.0 )
 	R = cv2.getRotationMatrix2D(center,degree,1)
-	I = cv2.warpAffine(I,R,(crop_size_x,crop_size_y),borderValue=border_color)
+	I = cv2.warpAffine(I,R,(crop_size_x,crop_size_y),borderValue=border_color, borderMode=cv2.BORDER_CONSTANT)
 
 	if points is not None:
 		for i in xrange(points.shape[0]):
@@ -58,14 +64,35 @@ def augRotate(I, points=None, max_rot_degree=30.0, crop_size_x=None, crop_size_y
 
 	return I, points, degree
 
+
 def rotatePoint(p,R):
 	x_new = R[0,0] * p[0] + R[0,1] * p[1] + R[0,2]
 	y_new = R[1,0] * p[0] + R[1,1] * p[1] + R[1,2]
 	return np.array((x_new,y_new))
 
-def augCrop(I,joints,obj_pos, param, shift_px=2.0, rand_shift = None):
-	crop_size_x = param['crop_size_x']
-	crop_size_y = param['crop_size_y']
+
+def augShift(I, joints=None, shift_px=2., rand_shift=None, border_color=(0, 0, 0)):
+	if rand_shift is not None:
+	  x_shift = rand_shift[0]
+	  y_shift = rand_shift[1]
+	else:
+	  x_shift, y_shift = randShift( shift_px )
+
+	T = np.float32([[1, 0, x_shift],[0, 1, y_shift]])
+	I = cv2.warpAffine(I, T, None, borderMode=cv2.BORDER_CONSTANT, borderValue=border_color)
+
+	if joints:
+		joints[:,0] += x_shift
+		joints[:,1] += y_shift
+
+	return I, joints
+
+
+
+def augCrop(I, joints, obj_pos, param=None, shift_px=2.0, rand_shift = None):
+	if param:
+		crop_size_x = param['crop_size_x']
+		crop_size_y = param['crop_size_y']
 
 	if rand_shift is not None:
 	  x_shift = rand_shift[0]
@@ -76,7 +103,7 @@ def augCrop(I,joints,obj_pos, param, shift_px=2.0, rand_shift = None):
 	y_offset = (crop_size_y-1.0)/2.0 - (obj_pos[1] + y_shift)
 
 	T = np.float32([[1,0,x_offset],[0,1,y_offset]])
-	I = cv2.warpAffine(I,T,(crop_size_x,crop_size_y))
+	I = cv2.warpAffine(I, T, None, borderMode=cv2.BORDER_CONSTNAT, borderValue=(1, 1, 1))
 
 	joints[:,0] += x_offset
 	joints[:,1] += y_offset
@@ -85,18 +112,23 @@ def augCrop(I,joints,obj_pos, param, shift_px=2.0, rand_shift = None):
 
 	return I,joints,obj_pos
 
-aug_spaces = [(cv2.COLOR_BGR2HSV, cv2.COLOR_HSV2BGR, None), (cv2.COLOR_BGR2YCR_CB, cv2.COLOR_YCR_CB2BGR, None),(None,None,None)]
 
-def augSaturation( I, aug_percent = 0.2 ):
-	rand_space = aug_spaces[ int(round(np.random.rand(1)[0]*len(aug_spaces)-1) )]
+aug_spaces = [(cv2.COLOR_BGR2HSV, cv2.COLOR_HSV2BGR, [1]), (cv2.COLOR_BGR2YCR_CB, cv2.COLOR_YCR_CB2BGR, [0]),(None,None,None)]
+def rand_colorspace():
+	return aug_spaces[ int(round(np.random.rand(1)[0]*len(aug_spaces)-1) )]
 
-	aug_channels = rand_space[2]
+
+def augSaturation( I, aug_percent = 0.2, aug_colorspace=None, aug_channels=None ):
+	if aug_colorspace is None:
+		aug_colorspace = rand_colorspace()
+
 	if aug_channels is None:
-		aug_channels = rand_channels()# int(round(np.random.rand(1)[0]*2))
+		aug_channels = rand_channels(aug_colorspace)# int(round(np.random.rand(1)[0]*2))
 	
 	for chan in aug_channels:
-		I = scaleImgChannel( I, rand_space[0], rand_space[1], chan, aug_percent )
+		I = scaleImgChannel( I, aug_colorspace[0], aug_colorspace[1], chan, aug_percent )
 	return I
+
 
 def augBlur(I, max_blur_sigma = 10.0 ):
 	blur_sigma = int(np.random.rand(1)[0]*max_blur_sigma)
@@ -105,9 +137,12 @@ def augBlur(I, max_blur_sigma = 10.0 ):
 		I = cv2.GaussianBlur( I, (kernel_size, kernel_size), blur_sigma )
 	return I
 
-def rand_channels():
-	# select 1-3 channels randomly from the 3 channels available
-	return np.random.choice( range(3), int(1+np.random.rand(1)*2), replace=False)
+def rand_channels(colorspace):
+	if colorspace[2] is None:
+		# select 1-3 channels randomly from the 3 channels available
+		return np.random.choice( range(3), int(1+np.random.rand(1)*2), replace=False)
+	else:
+		return colorspace[2]
 
 def augNoise(I, max_noise_sigma = 0.1 ):
 	noise_sigma = abs((np.random.randn(1)[0] - 0.5)*2 * max_noise_sigma)
@@ -132,13 +167,19 @@ def augNoise(I, max_noise_sigma = 0.1 ):
 	I = np.clip( np.add(I, noise),0,1.0)
 	return I
 
-def scaleImgChannel(I, fwd_color_space = cv2.COLOR_BGR2HSV, bck_color_space=cv2.COLOR_HSV2BGR, channel=None, aug_percent = 0.2 ):
+def scaleImgChannel(I, 
+		fwd_color_space=cv2.COLOR_BGR2HSV, 
+		bck_color_space=cv2.COLOR_HSV2BGR, 
+		channel=None, 
+		aug_percent = 0.2 ):
+
 	if np.max(I) > 1.0 and not I.dtype == np.float32:
 		I = np.multiply(I.astype(np.float32), 1/255.0)
 	I = I.astype(np.float32)
 	if fwd_color_space is not None:
 		I = cv2.cvtColor( I, fwd_color_space )
-	s_scale = randScale( 1.0 - aug_percent, 1.0 + aug_percent )
+	s_scale = aug_percent
+	#s_scale = randScale( 1.0 - aug_percent, 1.0 + aug_percent )
 	I[:,:,channel] = np.multiply( I[:,:,channel], s_scale )
 	if fwd_color_space is not None:
 		I = cv2.cvtColor( I, bck_color_space )
@@ -159,7 +200,7 @@ def swapLeftRight(joints):
 
 	return joints
 
-def augFlip(I,joints=None, obj_pos=None,flip_rand=None ):
+def augFlip(I, joints=None, obj_pos=None,flip_rand=None ):
 	if flip_rand is not None:
 	  do_flip = flip_rand
 	else:
@@ -203,56 +244,71 @@ def augProjective(I, max_theta = [15.,15.,15.], scale=1., max_shear = 0.2 ):
 	I_in = I.astype(np.float32)
 
 	I_out = np.zeros( img_shape, dtype=np.float32 )
-	theta = np.random.rand( 3 )*max_theta*2.0 - max_theta
+	theta = np.reshape(np.random.rand( 3 ), (3,)) * np.reshape(max_theta, (3,))*2.0 - np.reshape(max_theta, (3,))
 	theta = theta*math.pi/180.0
-
 	h = img_shape[0]
 	w = img_shape[1]
 	s = 1.
-	R_x = np.asarray( [ [1., 0. ,0.],
-										 	[0., s*np.cos(theta[0]), s*np.sin(theta[0])], 
-											[0., -s*np.sin(theta[0]), s*np.cos(theta[0])] ], dtype=np.float32 )
-	R_y = np.asarray( [	[s*np.cos(theta[1]),0, -s*np.sin(theta[1])], 
-											[0., 1., 0.], 
-											[ s*np.sin(theta[1]), 0., s*np.cos(theta[1])] ], dtype=np.float32)
-	R_z = np.asarray( [	[np.cos(theta[2]), np.sin(theta[2]), 0.],
-					 						[-np.sin(theta[2]), np.cos(theta[2]), 0.], 
-											[0., 0., 1.] ], dtype=np.float32)
-	R  = np.matmul( R_y, R_x )
-	R = np.matmul( R_z, R )
+	R_x = np.asarray( [[1., 0. ,0., 0.],
+					 	[0., s*np.cos(theta[0]), -s*np.sin(theta[0]), 0.], 
+						[0., s*np.sin(theta[0]), s*np.cos(theta[0]), 0.],
+						[0., 0. ,0., 1.]], dtype=np.float32 )
+	R_z = np.asarray( [ [ s*np.cos(theta[2]), -s*np.sin(theta[2]), 0., 0.], 
+						[ s*np.sin(theta[2]), s*np.cos(theta[2]), 0., 0.],
+						[0., 0. ,1., 0.],
+						[0., 0. ,0., 1.]], dtype=np.float32 )
+	R_y = np.asarray( [ [s*np.cos(theta[1]), 0., s*np.sin(theta[1]), 0.], 
+						[0., 1. ,0., 0.],
+						[-s*np.sin(theta[1]), 0., s*np.cos(theta[1]), 0.],
+						[0., 0. ,0., 1.],
+						], dtype=np.float32 )
+	'''
+	R_y = np.asarray( [	[s*np.cos(theta[1]), 0, s*np.sin(theta[1])], 
+						[0., 1., 0.], 
+						[ -s*np.sin(theta[1]), 0., s*np.cos(theta[1])] ], dtype=np.float32)
 
- 
-	t = np.zeros((3,1))
-	t[2] = img_shape[0]
-	RT = np.concatenate( [R,t], axis=1 )
-	
-	xv, yv, zv = np.meshgrid( np.linspace( -w/2,w/2, w), np.linspace( -h/2,h/2,h), 0. )
+	R_z = np.asarray( [	[np.cos(theta[2]), np.sin(theta[2]), 0.],
+					 	[-np.sin(theta[2]), np.cos(theta[2]), 0.], 
+						[0., 0., 1.] ], dtype=np.float32)
+	'''
+	R  = np.matmul( R_y, R_x )
+	RT = np.matmul( R_z, R )
+
+	# 	
+	xv, yv, zv = np.meshgrid( np.linspace( -w/2., w/2., w), np.linspace( -h/2., h/2., h), 0. )
 
 	xyz = np.concatenate( [ np.reshape(xv,(1,np.prod(xv.shape))), 
-													np.reshape(yv,(1,np.prod(yv.shape))),
-													np.reshape(zv,(1,np.prod(zv.shape))),
-													np.ones( (1,np.prod(xv.shape))) ], axis=0 )
+							np.reshape(yv,(1,np.prod(yv.shape))),
+							np.reshape(zv,(1,np.prod(zv.shape))),
+							np.ones( (1,np.prod(xv.shape))) ], axis=0 )
 	xyz_camera = np.matmul(RT, xyz)
 
-	f_x = img_shape[0] *1.2# focal distance in pixels
+	f_x = 1.
 	f_y = f_x
 
 	x_0 = 0
 	y_0 = 0
 
-	s = np.random.rand(1)*2*max_shear-max_shear
-	K = np.asarray( [[f_x, s, x_0], [0.,f_y, y_0], [0.,0.,1.]], dtype=np.float32 )
-
-	xy_im = np.matmul(K, xyz_camera)
-	norm_row = np.tile( xy_im[-1], (3,1 ))
-	xy_im = np.divide(xy_im, norm_row)
-
+	if max_shear is None:
+		s = 1.
+	else:
+		s = np.random.rand(1)*2*max_shear-max_shear
+#	K = np.asarray( [[f_x, s, x_0], [0.,f_y, y_0], [0.,0.,1.]], dtype=np.float32 )
+#	print(K)
+#	xy_im = np.matmul(K, xyz_camera)
+#	norm_row = np.tile( xy_im[-1], (3,1 ))
+#	xy_im = np.divide(xy_im, norm_row)
+	xy_im = xyz_camera
 	for c in range(I.shape[-1]):
-		Vq = map_coordinates( I_in[:,:,c].transpose(), xy_im[:2] + np.tile( np.asarray([[w/2],[h/2]]), (1,xy_im.shape[-1])), cval=1. )#[np.arange(0,img_shape[1]), np.arange(0,img_shape[0])] )
+		# image is currently centered at (0, 0), let's move it back to the center of the frame
+		center_adjustment = np.tile( np.asarray([[w / 2.], [h / 2.]]), (1, xy_im.shape[-1]))
+		Vq = map_coordinates( I_in[:,:,c].transpose(), 
+				xy_im[:2] + center_adjustment, cval=1. )
 		I_out[:,:,c] = np.reshape(Vq, img_shape[:-1])
 	return I_out,theta 
 #	I_in_flat = np.reshape( I_in, 
 if __name__=='__main__':
-	I = cv2.imread('../datasets/MTGVS/train/1.jpg' )
-	I_ap = augProjective(I, I.shape)
-	cv2.imwrite('projtest.jpg',I_ap*255)
+	I = cv2.imread('/home/xamyzhao/MTGVS/db_all_new/14500.jpg' )
+	I = cv2.resize(I, None, fx=0.25, fy=0.25)
+	I_ap, _ = augProjective(I, max_theta=60., max_shear=None)
+	cv2.imwrite('projtest.jpg',I_ap)

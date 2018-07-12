@@ -12,6 +12,19 @@ num_models_to_keep = 3
 num_figs_to_keep = 3
 
 
+def keep_closest_to_milestones(milestone_interval, nums_to_remove):
+	milestone_nums = np.arange(0, max(nums_to_remove)+1, milestone_interval).astype(int)
+
+	nums_to_keep = []
+	# keep the closest example to each milestone
+	for mn in milestone_nums:
+		dists_from_milestone = np.asarray(nums_to_remove) - mn
+		nums_to_keep.append(nums_to_remove[np.argmin(np.abs(dists_from_milestone))])
+	print('Keeping {}'.format(nums_to_keep))
+	nums_to_remove = [n for n in nums_to_remove if n not in nums_to_keep]
+	print('Removing {}'.format(nums_to_remove))
+	return nums_to_remove
+
 def remove_all_but_milestones_and_recent( in_dir, file_exts, num_prefix, milestone_interval, num_recent_to_keep = 3, test=False ):
 	files = [ os.path.join( in_dir, f) for f in os.listdir( in_dir ) if np.any( [f.endswith(e) for e in file_exts])  \
 									if re.search('(?<={})[0-9]*'.format( num_prefix),f) is not None ]
@@ -28,9 +41,13 @@ def remove_all_but_milestones_and_recent( in_dir, file_exts, num_prefix, milesto
 #		print(nums)
 #		files_to_remove = files[:-num_recent_to_keep] 
 		nums_to_remove = sorted(list(set(nums)))[:-num_recent_to_keep]
-		nums_to_remove = [ n for n in nums_to_remove if n % milestone_interval > 0 ]
+		
 		if len(nums_to_remove) == 0:
 			return
+		nums_to_remove = keep_closest_to_milestones(milestone_interval, nums_to_remove)
+		if len(nums_to_remove) == 0:
+			return
+	
 
 		files_to_remove = [f for f in files if np.any( ['{}{}_'.format(num_prefix, ntr) in os.path.basename(f) or '{}{}.'.format(num_prefix,ntr) in os.path.basename(f) for ntr in nums_to_remove]) ]
 		 
@@ -52,6 +69,16 @@ def remove_all_but_milestones_and_recent( in_dir, file_exts, num_prefix, milesto
 
 exp_dir = './experiments'
 if __name__ == '__main__':
+	import sys
+	# unit test
+	remove_nums = keep_closest_to_milestones(100, np.arange(0, 200, 21).astype(int))
+	assert 0 not in remove_nums
+	assert 105 not in remove_nums
+
+	remove_nums = keep_closest_to_milestones(100, np.arange(0, 300, 100).astype(int))
+	assert 100 not in remove_nums
+	assert 200 not in remove_nums
+
 	ap = argparse.ArgumentParser()
 	ap.add_argument( '-nd', nargs='?', type=str, help='networks dir', default = './models' )
 	ap.add_argument( '-od', nargs='?', type=str, help='figures dir', default = './figures' )
