@@ -4,7 +4,9 @@ import math
 import scipy.io as sio
 from scipy.interpolate import RegularGridInterpolator, interp2d, RectBivariateSpline
 from scipy.ndimage import map_coordinates
-
+import sys
+sys.path.append('../LPAT')
+import image_utils
 
 def augScale(I, points=None, scale_rand=None, obj_scale = 1.0, target_scale = 1.0, pad_value=None, border_color=(0,0,0) ):
 	if scale_rand is not None:
@@ -89,28 +91,36 @@ def augShift(I, joints=None, shift_px=2., rand_shift=None, border_color=(0, 0, 0
 
 
 
-def augCrop(I, joints, obj_pos, param=None, shift_px=2.0, rand_shift = None):
-	if param:
-		crop_size_x = param['crop_size_x']
-		crop_size_y = param['crop_size_y']
+def augCrop(I, pad_to_size, crop_to_size=None, crop_to_size_range=None, crop_center=None, border_color=(0, 0, 0)):
+	# if the crop size is not defined
+	if crop_to_size is None:
+		if crop_to_size_range is None:
+			crop_to_size = pad_to_size
+		else:
+			# assume we have a list of two tuples, the first one is the row range
+			# and the second tuple is the cols range
+			crop_to_size = [
+				np.random.rand(1)[0] * \
+					(crop_to_size_range[0][1] - crop_to_size_range[0][0]) + crop_to_size_range[0][0],
+				np.random.rand(1)[0] * \
+					(crop_to_size_range[1][1] - crop_to_size_range[1][0]) + crop_to_size_range[1][0]
+			]
+	crop_to_size = np.asarray(crop_to_size, dtype=np.float32)
 
-	if rand_shift is not None:
-	  x_shift = rand_shift[0]
-	  y_shift = rand_shift[1]
-	else:
-	  x_shift, y_shift = randShift( shift_px )
-	  x_offset = (crop_size_x-1.0)/2.0 - (obj_pos[0] + x_shift)
-	y_offset = (crop_size_y-1.0)/2.0 - (obj_pos[1] + y_shift)
+	if crop_center is None:
+		# min and max rows and columns
+		min_rc = crop_to_size / 2.
+		max_rc = I.shape[:2] - crop_to_size / 2.
+		crop_center = np.random.rand(2) * (max_rc - min_rc) + min_rc
 
-	T = np.float32([[1,0,x_offset],[0,1,y_offset]])
-	I = cv2.warpAffine(I, T, None, borderMode=cv2.BORDER_CONSTNAT, borderValue=(1, 1, 1))
+	start_row = max(0, int(np.round(crop_center[0] - crop_to_size[0] / 2.)))
+	start_col = max(0, int(np.round(crop_center[1] - crop_to_size[1] / 2.)))
+	I = I[start_row : start_row + int(crop_to_size[0]), start_col : start_col + int(crop_to_size[1])]
 
-	joints[:,0] += x_offset
-	joints[:,1] += y_offset
-	obj_pos[0] += x_offset
-	obj_pos[1] += y_offset
+	# pad to the output shape if necessary
+	I = image_utils.pad_or_crop_to_shape(I, pad_to_size, border_color=border_color)
 
-	return I,joints,obj_pos
+	return I, crop_to_size, crop_center
 
 
 aug_spaces = [(cv2.COLOR_BGR2HSV, cv2.COLOR_HSV2BGR, [1]), (cv2.COLOR_BGR2YCR_CB, cv2.COLOR_YCR_CB2BGR, [0]),(None,None,None)]
