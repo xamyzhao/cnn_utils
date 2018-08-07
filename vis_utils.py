@@ -8,6 +8,7 @@ import cv2
 import textwrap
 import image_utils
 import PIL
+from PIL import Image, ImageDraw, ImageFont
 import matplotlib as mpl
 
 mpl.use('Agg')
@@ -128,8 +129,8 @@ def label_ims(ims_batch, labels=None,
 	font_size = 15
 	max_text_width = int(17 * display_h / 128.)  # empirically determined
 	if len(labels) > 0:
-		im_pil = PIL.Image.fromarray(out_im.astype(np.uint8))
-		draw = PIL.ImageDraw.Draw(im_pil)
+		im_pil = Image.fromarray(out_im.astype(np.uint8))
+		draw = ImageDraw.Draw(im_pil)
 		for i in range(batch_size):
 			if len(labels) > i:  # if we have a label for this image
 				if type(labels[i]) == tuple or type(labels[i]) == list:
@@ -148,7 +149,7 @@ def label_ims(ims_batch, labels=None,
 				else:
 					formatted_text = '{}'.format(labels[i])
 
-				font = PIL.ImageFont.truetype('Ubuntu-M.ttf', font_size)
+				font = ImageFont.truetype('Ubuntu-M.ttf', font_size)
 				# wrap the text so it fits
 				formatted_text = textwrap.wrap(formatted_text, width=max_text_width)
 
