@@ -1,6 +1,6 @@
-import data_utils
+
 import numpy as np
-import cv2
+
 import scipy.ndimage as spnd
 
 import sys
@@ -11,6 +11,30 @@ sys.path.append('../cnn_utils')
 
 from augmentation_functions import augSaturation,augBlur,augNoise,augScale,augRotate,randScale,randRot, augProjective, randFlip, augFlip,  augShift, rand_colorspace, rand_channels, augCrop
 import sampling_utils
+
+def make_affine_matrix_batch(
+		batch_size,
+		thetas=None, scales=None, trans_x=None, trans_y=None,
+		do_flip_horiz=None, do_flip_vert=None
+):
+	for param in [thetas, scales, trans_x, trans_y, do_flip_horiz, do_flip_vert]:
+		if param is None:
+			param = np.zeros((batch_size,))
+
+	T = np.zeros((batch_size, 2, 3))
+
+	flip_horiz_factor = -1 * do_flip_horiz.astype(float)
+	flip_vert_factor = -1 * do_flip_vert.astype(float)
+	# rotation and scaling
+	T[:, 0, 0] = np.cos(thetas) * scales * flip_horiz_factor
+	T[:, 0, 1] = -np.sin(thetas)
+	T[:, 1, 0] = np.sin(thetas)
+	T[:, 1, 1] = np.cos(thetas) * scales * flip_vert_factor
+
+	# translation
+	T[:, 0, 2] = trans_x
+	T[:, 1, 2] = trans_y
+	return T
 
 def aug_params_to_transform_matrices(
 		batch_size,
@@ -25,30 +49,24 @@ def aug_params_to_transform_matrices(
 	if not isinstance(max_trans, tuple) and not isinstance(max_trans, list):
 		max_trans = (max_trans, max_trans)
 
-	T = np.zeros((batch_size, 2, 3))
+
 	thetas = np.pi * (np.random.rand(batch_size) * max_rot * 2. - max_rot) / 180.
 	scales = np.random.rand(batch_size) * (scale_range[1] - scale_range[0]) + scale_range[0]
 	trans_x = np.random.rand(batch_size) * max_trans[0] * 2. - max_trans[0]
 	trans_y = np.random.rand(batch_size) * max_trans[1] * 2. - max_trans[1]
 
-	flip_horiz_factor = np.ones((batch_size,))
-	flip_vert_factor = np.ones((batch_size,))
 	if apply_flip:
 		do_flip_horiz = np.random.rand(batch_size) > 0.5
-		flip_horiz_factor[do_flip_horiz] = -1.
-
 		do_flip_vert = np.random.rand(batch_size) > 0.5
-		flip_vert_factor[do_flip_vert] = -1.
+	else:
+		do_flip_horiz = np.zeros((batch_size,))
+		do_flip_vert = np.zeros((batch_size,))
 
-	# rotation and scaling
-	T[:, 0, 0] = np.cos(thetas) * scales * flip_horiz_factor
-	T[:, 0, 1] = -np.sin(thetas) 
-	T[:, 1, 0] = np.sin(thetas)
-	T[:, 1, 1] = np.cos(thetas) * scales * flip_vert_factor
+	T = make_affine_matrix_batch(
+		thetas, scales, trans_x, trans_y,
+		do_flip_horiz, do_flip_vert
+	)
 
-	# translation
-	T[:, 0, 2] = trans_x
-	T[:, 1, 2] = trans_y
 	return T
 
 def _apply_flow_batch(X_batch, flow_batch):
