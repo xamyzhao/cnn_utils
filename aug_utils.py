@@ -17,9 +17,13 @@ def make_affine_matrix_batch(
 		thetas=None, scales=None, trans_x=None, trans_y=None,
 		do_flip_horiz=None, do_flip_vert=None
 ):
-	for param in [thetas, scales, trans_x, trans_y, do_flip_horiz, do_flip_vert]:
+
+	# hacky way to set default vals
+	params =  [thetas, scales, trans_x, trans_y, do_flip_horiz, do_flip_vert]
+	for pi, param in enumerate(params):
 		if param is None:
-			param = np.zeros((batch_size,))
+			params[pi] = np.zeros((batch_size,))
+	thetas, scales, trans_x, trans_y, do_flip_horiz, do_flip_vert = params
 
 	T = np.zeros((batch_size, 2, 3))
 
