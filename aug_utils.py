@@ -28,6 +28,9 @@ def make_affine_matrix_batch(
 	if scales is None:
 		scales = np.ones((batch_size,))
 
+	if len(scales.shape) == 1:  # same scale for both dims
+		scales = np.expand_dims(scales, axis=-1)
+
 	T = np.zeros((batch_size, 2, 3))
 
 	flip_horiz_factor = np.ones((batch_size,))
@@ -38,10 +41,10 @@ def make_affine_matrix_batch(
 		if do_flip_vert[i]:
 			flip_vert_factor[i] = -1
 	# rotation and scaling
-	T[:, 0, 0] = np.cos(thetas) * scales * flip_horiz_factor
+	T[:, 0, 0] = np.cos(thetas) * scales[:, 0] * flip_horiz_factor
 	T[:, 0, 1] = -np.sin(thetas)
 	T[:, 1, 0] = np.sin(thetas)
-	T[:, 1, 1] = np.cos(thetas) * scales * flip_vert_factor
+	T[:, 1, 1] = np.cos(thetas) * scales[:, 1] * flip_vert_factor
 
 	# translation
 	T[:, 0, 2] = trans_x
