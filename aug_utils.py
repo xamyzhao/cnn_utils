@@ -19,16 +19,24 @@ def make_affine_matrix_batch(
 ):
 
 	# hacky way to set default vals
-	params =  [thetas, scales, trans_x, trans_y, do_flip_horiz, do_flip_vert]
+	params =  [thetas, trans_x, trans_y, do_flip_horiz, do_flip_vert]
 	for pi, param in enumerate(params):
 		if param is None:
 			params[pi] = np.zeros((batch_size,))
-	thetas, scales, trans_x, trans_y, do_flip_horiz, do_flip_vert = params
+	thetas, trans_x, trans_y, do_flip_horiz, do_flip_vert = params
+
+	if scales is None:
+		scales = np.ones((batch_size,))
 
 	T = np.zeros((batch_size, 2, 3))
 
-	flip_horiz_factor = -1 * do_flip_horiz.astype(float)
-	flip_vert_factor = -1 * do_flip_vert.astype(float)
+	flip_horiz_factor = np.ones((batch_size,))
+	flip_vert_factor = np.ones((batch_size,))
+	for i in range(batch_size):
+		if do_flip_horiz[i]:
+			flip_horiz_factor[i] = -1
+		if do_flip_vert[i]:
+			flip_vert_factor[i] = -1
 	# rotation and scaling
 	T[:, 0, 0] = np.cos(thetas) * scales * flip_horiz_factor
 	T[:, 0, 1] = -np.sin(thetas)
