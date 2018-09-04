@@ -45,6 +45,7 @@ if __name__ == '__main__':
 			imFiles = [f for f in os.listdir(inDir) if (f.endswith('.png') or f.endswith('.jpg')) and 'epoch' and prefix in f]
 
 			if len(imFiles) == 0:
+				print('Found no images in {}! Skipping...'.format(inDir))
 				continue
 
 			epochNums = np.unique([int(re.search('(?<=epoch)[0-9]*(?=_)', f).group(0)) for f in imFiles ])
@@ -78,7 +79,7 @@ if __name__ == '__main__':
 				epochsToShow.append(epochToShow)
 			
 			epochsToShow = [epochsInRange[i] for i in epochIdxs]
-
+			print(epochsToShow)
 			for en in epochsToShow:
 				curr_epoch_ims = [os.path.join(inDir,f) for f in imFiles if 'epoch' + str(en) + '_' in f]
 
@@ -86,8 +87,8 @@ if __name__ == '__main__':
 				curr_n_batches_to_show = min( len(curr_epoch_ims), n_batches_to_show)
 				for bi in np.linspace(0, len(curr_epoch_ims)-1, curr_n_batches_to_show, dtype=int): 
 					curr_prefix_im_files[epoch_count, batch_count] = curr_epoch_ims[bi]
-
-					if bi==0:
+					print(bi)
+					if bi == 0:
 						im = cv2.imread(curr_epoch_ims[bi])
 						R = im.shape[0] * max(1,int( 480.0 / im.shape[1]))
 						C = im.shape[1] * max(1,int( 480 / im.shape[1]))

@@ -42,7 +42,7 @@ def filenames_to_im_ids( im_files ):
 	return im_file_ids
 
 
-def make_output_dirs(base_model_name):
+def make_output_dirs(base_model_name, prompt_delete=True):
 	exp_root = './experiments/'
 	fig_root = './figures/'
 	log_root = './logs/'
@@ -77,7 +77,7 @@ def make_output_dirs(base_model_name):
 		else:
 			model_files = []
 
-		if len(figure_files) > 0 or len(log_files) > 0 or len(model_files) > 0:
+		if prompt_delete and (len(figure_files) > 0 or len(log_files) > 0 or len(model_files) > 0):
 			print(
 				'Remove \n\t{} figures from {}\n\t{} logs from {}\n\t{} models from {}?\n[y]es / [n]o (create new folder) / [C]ontinue existing / remove [m]odels too: [y/n/C/m]'.format(
 					len(figure_files), figures_dir, len(log_files), logs_dir, len(model_files), models_dir))

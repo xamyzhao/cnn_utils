@@ -29,7 +29,7 @@ def make_affine_matrix_batch(
 		scales = np.ones((batch_size,))
 
 	if len(scales.shape) == 1:  # same scale for both dims
-		scales = np.expand_dims(scales, axis=-1)
+		scales = np.tile(np.expand_dims(scales, axis=-1), (1, 2))
 
 	T = np.zeros((batch_size, 2, 3))
 

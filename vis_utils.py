@@ -71,7 +71,7 @@ def label_ims(ims_batch, labels=None,
 				labels[i] = ''
 
 			for c in range(len(min_flow)):
-				labels[i] += '({},{})'.format(round(min_flow[c], 1), round(max_flow[c], 1))
+				labels[i] += '({}, {})'.format(round(min_flow[c], 1), round(max_flow[c], 1))
 		ims_batch = X_fullcolor.copy()
 
 	elif inverse_normalize:
@@ -82,6 +82,7 @@ def label_ims(ims_batch, labels=None,
 		X_flat = np.reshape(ims_batch, (ims_batch.shape[0], -1))
 		X_orig_min = np.min(X_flat, axis=1)
 		X_orig_max = np.max(X_flat, axis=1)
+		print('Min {}, max {}'.format(np.min(X_flat),np.max(X_flat)))
 		X_flat = X_flat - np.tile(np.min(X_flat, axis=1, keepdims=True), (1, flattened_dims))
 		X_flat = X_flat / np.tile(np.max(X_flat, axis=1, keepdims=True), (1, flattened_dims))
 		ims_batch = np.reshape(X_flat, ims_batch.shape)
@@ -93,7 +94,7 @@ def label_ims(ims_batch, labels=None,
 				labels[i] = ''
 			# show the min, max of each channel
 			for c in range(ims_batch.shape[3]):
-				labels[i] += '({},{})'.format(round(X_orig_min[i], 2), round(X_orig_max[i], 2))
+				labels[i] += '({}, {})'.format(round(X_orig_min[i], 2), round(X_orig_max[i], 2))
 	else:
 		ims_batch = np.clip(ims_batch, 0., 1.)
 
@@ -247,3 +248,29 @@ def plot_data_to_im(x, y, min_h=128):
 	sf = float(min_h) / X.shape[0]
 	X = spm.imresize(X[:, :, :3], float(sf))
 	return X
+
+# edited from adrian
+def create_bw_grid(vol_size, spacing):
+	"""
+	create a black and white grid (white lines on a black volume)
+	useful for visualizing a warp.
+	"""
+	grid_image = np.zeros(vol_size)
+	grid_image[np.arange(0, vol_size[0], spacing, dtype=int), :] = 1
+	grid_image[:, np.arange(0, vol_size[1], spacing, dtype=int)] = 1
+
+	return grid_image
+
+def flow_to_grid(flow, spacing=10):
+	from scipy import interpolate
+	grid = create_bw_grid(flow.shape[:2], spacing=spacing)
+	h, w, c = flow.shape
+	x = np.linspace(0, w, w, endpoint=False)
+	y = np.linspace(0, h, h, endpoint=False)
+	xx, yy = np.meshgrid(x, y)
+	sample = flow + np.concatenate([np.expand_dims(xx, axis=-1), np.expand_dims(yy, axis=-1)], axis=-1)
+	grid_warped = interpolate.interpn((y, x), grid, sample, bounds_error=False, fill_value=0)
+	return np.reshape(grid_warped, grid.shape)
+
+if __name__ == '__main__':
+	warped = flow_to_grid(np.zeros((100, 100, 2)))
