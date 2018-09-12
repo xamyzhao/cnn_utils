@@ -6,24 +6,25 @@ import scipy.ndimage as spnd
 import sys
 
 import image_utils
-
+import cv2
 sys.path.append('../cnn_utils')
 
 from augmentation_functions import augSaturation,augBlur,augNoise,augScale,augRotate,randScale,randRot, augProjective, randFlip, augFlip,  augShift, rand_colorspace, rand_channels, augCrop
-import sampling_utils
+#import sampling_utils
 
 def make_affine_matrix_batch(
 		batch_size,
 		thetas=None, scales=None, trans_x=None, trans_y=None,
+		shear_x=None, shear_y=None,
 		do_flip_horiz=None, do_flip_vert=None
 ):
 
 	# hacky way to set default vals
-	params =  [thetas, trans_x, trans_y, do_flip_horiz, do_flip_vert]
+	params =  [thetas, trans_x, trans_y, shear_x, shear_y, do_flip_horiz, do_flip_vert]
 	for pi, param in enumerate(params):
 		if param is None:
 			params[pi] = np.zeros((batch_size,))
-	thetas, trans_x, trans_y, do_flip_horiz, do_flip_vert = params
+	thetas, trans_x, trans_y, shear_x, shear_y, do_flip_horiz, do_flip_vert = params
 
 	if scales is None:
 		scales = np.ones((batch_size,))
@@ -40,6 +41,13 @@ def make_affine_matrix_batch(
 			flip_horiz_factor[i] = -1
 		if do_flip_vert[i]:
 			flip_vert_factor[i] = -1
+
+	shear_mat = np.zeros((batch_size, 2, 3))
+	shear_mat[:, 0, 0] = 1
+	shear_mat[:, 1, 1] = 1
+	shear_mat[:, 0, 1] = shear_x
+	shear_mat[:, 1, 0] = shear_y
+
 	# rotation and scaling
 	T[:, 0, 0] = np.cos(thetas) * scales[:, 0] * flip_horiz_factor
 	T[:, 0, 1] = -np.sin(thetas)
@@ -49,13 +57,23 @@ def make_affine_matrix_batch(
 	# translation
 	T[:, 0, 2] = trans_x
 	T[:, 1, 2] = trans_y
+
+	# do matrix multiplication for each element of the batch separately
+	T = np.concatenate([np.expand_dims(np.matmul(
+		np.concatenate([T[bi], [[0, 0, 1]]], axis=0), # add last row to transformation matrix to make it 3x3
+		np.concatenate([shear_mat[bi], [[0, 0, 1]]], axis=0))[:2], # remove the last row
+	                                   axis=0)
+	                    for bi in range(batch_size)], axis=0)
+
 	return T
+
 
 def aug_params_to_transform_matrices(
 		batch_size,
 		max_rot=0.,
 		scale_range=(0, 0),
 		max_trans=(0, 0),  # x, y
+		max_shear=(0, 0),
 		apply_flip=False,
 	):
 	if not isinstance(scale_range, tuple) and not isinstance(scale_range,list):
@@ -64,11 +82,15 @@ def aug_params_to_transform_matrices(
 	if not isinstance(max_trans, tuple) and not isinstance(max_trans, list):
 		max_trans = (max_trans, max_trans)
 
+	if not isinstance(max_shear, tuple) and not isinstance(max_shear, list):
+		max_shear = (max_shear, max_shear)
 
 	thetas = np.pi * (np.random.rand(batch_size) * max_rot * 2. - max_rot) / 180.
 	scales = np.random.rand(batch_size) * (scale_range[1] - scale_range[0]) + scale_range[0]
 	trans_x = np.random.rand(batch_size) * max_trans[0] * 2. - max_trans[0]
 	trans_y = np.random.rand(batch_size) * max_trans[1] * 2. - max_trans[1]
+	shear_x = np.random.rand(batch_size) * max_shear[0] * 2. - max_shear[0]
+	shear_y = np.random.rand(batch_size) * max_shear[1] * 2. - max_shear[1]
 
 	if apply_flip:
 		do_flip_horiz = np.random.rand(batch_size) > 0.5
@@ -78,11 +100,76 @@ def aug_params_to_transform_matrices(
 		do_flip_vert = np.zeros((batch_size,))
 
 	T = make_affine_matrix_batch(
-		thetas, scales, trans_x, trans_y,
+		thetas, scales,
+		trans_x, trans_y,
+		shear_x, shear_y,
 		do_flip_horiz, do_flip_vert
 	)
 
 	return T
+
+
+def _apply_transformation_matrix_batch(X_batch, T_batch):
+	batch_size, h, w, n_chans = X_batch.shape
+	# create coords about origin
+	xv, yv = np.meshgrid(np.linspace(-w/2, w/2, w, endpoint=False),
+						 np.linspace(-h/2, h/2, h, endpoint=False))
+
+
+	X_aug = X_batch.copy()
+	for bi in range(X_batch.shape[0]):
+		curr_T = np.concatenate([T_batch[bi], [[0, 0, 1]]], axis=0)
+
+		x_coords = xv.flatten()
+		y_coords = yv.flatten()
+
+		coords_grid = np.concatenate([x_coords[:, np.newaxis], y_coords[:, np.newaxis], np.ones(x_coords[:, np.newaxis].shape)],
+						   axis=-1).transpose()
+
+		map_coords = np.reshape(np.matmul(curr_T, coords_grid)[:2, :],
+			(2, X_batch.shape[1] * X_batch.shape[2]))
+
+
+		# convert back to image coords
+		map_coords[0, :] += w/2
+		map_coords[1, :] += h/2
+
+
+		map_coords = map_coords[::-1, :]  # convert coords to row, col
+
+		for c in range(X_batch.shape[-1]):
+			X_aug[bi, :, :, c] = np.reshape(
+				spnd.map_coordinates(X_batch[bi, :, :, c], map_coords, cval=0.),
+				X_batch.shape[1:3])
+
+	return X_aug
+
+
+def _test_affine_matrix():
+	test_im = np.kron([[1, 0] * 4, [0, 1] * 4] * 4, np.ones((10, 10)))
+	print(test_im.shape)
+	T = make_affine_matrix_batch(
+		batch_size=1,
+		# thetas=[np.pi*30/180.],
+		scales=np.reshape([1.2, 1.0], (1, 2)),
+		trans_y=[10],
+		# shear_y=[0.1],
+		do_flip_vert=[True]
+	)
+	print(T)
+	test_im_transformed =_apply_transformation_matrix_batch(
+		np.expand_dims(test_im[:, :, np.newaxis], axis=0), T
+	)[0, :, :, 0]
+
+	# verify visually
+	cv2.imshow('original', test_im)
+	cv2.imshow('transformed', test_im_transformed)
+
+	cv2.waitKey()
+
+if __name__ == '__main__':
+	_test_affine_matrix()
+
 
 def _apply_flow_batch(X_batch, flow_batch):
 	xv, yv = np.meshgrid(np.linspace(0, X_batch.shape[2], X_batch.shape[2], endpoint=False),
