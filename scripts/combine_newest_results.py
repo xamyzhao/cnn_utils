@@ -2,13 +2,13 @@ import os
 import numpy as np
 import glob
 import datetime
-exps_dir = './experiments'
 figures_dir = './figures'
 import argparse
 import time
 
 if __name__ == '__main__':
 	ap = argparse.ArgumentParser()
+	ap.add_argument('-exp_dir', nargs='?', type=str, default='experiments', dest='experiments_root')
 	ap.add_argument('min_h',type=float,default=24, nargs='?')
 	ap.add_argument('-filter', nargs='*', default=[], type=str, help='List of terms to filter (AND) for')
 	ap.add_argument('repeat_every',type=float,default=60, nargs='?')
@@ -18,13 +18,13 @@ if __name__ == '__main__':
 	while True:
 #		fig_dirs = [ os.path.join(figures_dir,d) for d in os.listdir(figures_dir) if os.path.isdir( os.path.join( figures_dir, d) )]
 		fig_dirs = []
-		for exp_dir in os.listdir(exps_dir):
-			if os.path.isdir( os.path.join(exps_dir,exp_dir) ):
-				for sub_dir in os.listdir(os.path.join(exps_dir,exp_dir)):
-					if 'figures' in sub_dir and os.path.isdir( os.path.join(exps_dir,exp_dir,sub_dir) ):
-						fig_dirs.append( os.path.join(exps_dir,exp_dir,sub_dir))
-#		fig_dirs = [ os.path.join( exps_dir, md, fd ) if os.path.isdir(os.path.join(exps_dir,md)) for md in os.listdir(exps_dir) for fd in os.listdir( os.path.join( exps_dir, md)) 
-#			 and os.path.isdir( os.path.join( exps_dir, md,fd)) and 'figures' in fd ]
+		for exp_dir in os.listdir(args.experiments_root):
+			if os.path.isdir( os.path.join(args.experiments_root, exp_dir) ):
+				for sub_dir in os.listdir(os.path.join(args.experiments_root,exp_dir)):
+					if 'figures' in sub_dir and os.path.isdir( os.path.join(args.experiments_root,exp_dir,sub_dir) ):
+						fig_dirs.append( os.path.join(args.experiments_root,exp_dir,sub_dir))
+#		fig_dirs = [ os.path.join( args.experiments_root, md, fd ) if os.path.isdir(os.path.join(args.experiments_root,md)) for md in os.listdir(args.experiments_root) for fd in os.listdir( os.path.join( args.experiments_root, md)) 
+#			 and os.path.isdir( os.path.join( args.experiments_root, md,fd)) and 'figures' in fd ]
 		dir_times = [ datetime.datetime.fromtimestamp(os.path.getmtime(d)) for d in fig_dirs] 
 
 		sorted_dir_time_pairs = [ list(x) for x in zip(*sorted(zip(fig_dirs, dir_times), key=lambda pair:pair[1])) ]

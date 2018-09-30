@@ -12,38 +12,39 @@ import numpy as np
 def filenames_to_im_ids( im_files ):
 	if isinstance(im_files[0], int):
 		return im_files
-	elif 'frame_' in im_files[0]:
+	elif im_files[0].startswith('frame'):
 		im_file_ids = [ int( os.path.splitext(os.path.basename(f))[0].split('_')[1] ) for f in im_files ]
-		return im_file_ids
-	elif 'frame' in im_files[0]:
-		im_file_ids = [ int(re.search('(?<=frame)[0-9]*', os.path.splitext(os.path.basename(f))[0]).group(0)) for f in im_files ]
 		return im_file_ids
 
 	try:
 		int(im_files[0])
+		im_file_ids = [ int( os.path.splitext(os.path.basename(f))[0] ) for f in im_files ]
+	
+	except ValueError:
+		'''
+		# just return these as strings? not sure why i wanted to do the conversion
+		im_file_ids = [os.path.splitext(os.path.basename(f))[0] for f in im_files]
 		
+		'''
 		if '_' in im_files[0]:
 			im_file_ids = [ int( os.path.splitext(os.path.basename(f))[0].split('_')[0] ) for f in im_files ]
 		else:
-			im_file_ids = [ int( os.path.splitext(os.path.basename(f))[0] ) for f in im_files ]
-	except ValueError:
-		im_file_ids = im_files[:]
-		for i,f in enumerate(im_files):
-			curr_str = []
-			first_seg = os.path.splitext(os.path.basename(f))[0].split('_')[0]
-			for c in first_seg:
-				try:
-					curr_str.append( str(int(c)))
-				except ValueError:
-					curr_str.append( str(ord(c)))
-			im_file_ids[i] = int(''.join(curr_str))
-#		im_file_ids = [ ''.join([str(ord(c)) for c in ]) for f in im_files ]
-#		print(im_file_ids)
+			im_file_ids = im_files[:]
+			for i,f in enumerate(im_files):
+				curr_str = []
+				first_seg = os.path.splitext(os.path.basename(f))[0].replace('_','') # TODO: check this for all naming formats we use
+				for c in first_seg:
+					try:
+						curr_str.append( str(int(c)))
+					except ValueError:
+						curr_str.append( str(ord(c)))
+				im_file_ids[i] = int(''.join(curr_str))
+	#		im_file_ids = [ ''.join([str(ord(c)) for c in ]) for f in im_files ]
+	#		print(im_file_ids)
 	return im_file_ids
 
 
-def make_output_dirs(base_model_name, prompt_delete=True):
-	exp_root = './experiments/'
+def make_output_dirs(base_model_name, prompt_delete=True, exp_root ='./experiments/'):
 	fig_root = './figures/'
 	log_root = './logs/'
 	model_root = './models/'
@@ -67,7 +68,9 @@ def make_output_dirs(base_model_name, prompt_delete=True):
 
 		if os.path.isdir(logs_dir):
 			log_files = [os.path.join(logs_dir, l) for l in os.listdir(logs_dir) \
-						 if os.path.isfile(os.path.join(logs_dir, l))]
+						 if os.path.isfile(os.path.join(logs_dir, l))] \
+						+ [os.path.join(experiment_dir, f) for f in os.listdir(experiment_dir) if f.endswith('.log')]
+			# also includde any .log files
 		else:
 			log_files = []
 

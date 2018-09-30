@@ -74,7 +74,7 @@ def aug_params_to_transform_matrices(
 		scale_range=(0, 0),
 		max_trans=(0, 0),  # x, y
 		max_shear=(0, 0),
-		apply_flip=False,
+		apply_flip=(False, False),
 	):
 	if not isinstance(scale_range, tuple) and not isinstance(scale_range,list):
 		scale_range = (1 - scale_range, 1 + scale_range)
@@ -92,14 +92,18 @@ def aug_params_to_transform_matrices(
 	shear_x = np.random.rand(batch_size) * max_shear[0] * 2. - max_shear[0]
 	shear_y = np.random.rand(batch_size) * max_shear[1] * 2. - max_shear[1]
 
-	if apply_flip:
+	if apply_flip[0]:
 		do_flip_horiz = np.random.rand(batch_size) > 0.5
-		do_flip_vert = np.random.rand(batch_size) > 0.5
 	else:
 		do_flip_horiz = np.zeros((batch_size,))
+
+	if apply_flip[1]:
+		do_flip_vert = np.random.rand(batch_size) > 0.5
+	else:
 		do_flip_vert = np.zeros((batch_size,))
 
 	T = make_affine_matrix_batch(
+		batch_size,
 		thetas, scales,
 		trans_x, trans_y,
 		shear_x, shear_y,

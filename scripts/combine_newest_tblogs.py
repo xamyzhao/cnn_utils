@@ -40,7 +40,7 @@ if __name__ == '__main__':
 	latest_dirs = [d[2:] for i,d in enumerate(sorted_dirs) if hours_since[i] < args.min_h ] #remove leading ./
 
 	if len(args.filter) > 0:
-		latest_dirs = [ d for d in sorted_dirs if np.all( [ft in d for ft in args.filter] )]
+		latest_dirs = [ d for d in latest_dirs if np.all( [ft in d for ft in args.filter] )]
 	if len(args.model_names) == 0:
 		model_names = [ os.path.basename( os.path.split( ld )[0] ) for ld in latest_dirs ]
 	else:

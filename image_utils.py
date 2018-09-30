@@ -78,6 +78,7 @@ def get_segmentation_mask(I, mask_color=(1., 1., 1.)):
 def create_gaussian_kernel(sigma, n_sigmas_per_side=8, n_dims=2):
 	t = np.linspace(-sigma * n_sigmas_per_side / 2, sigma * n_sigmas_per_side / 2, int(sigma * n_sigmas_per_side + 1))
 	gauss_kernel_1d = np.exp(-0.5 * (t / sigma) ** 2)
+
 	if n_dims == 2:
 		gauss_kernel_2d = gauss_kernel_1d[:, np.newaxis] * gauss_kernel_1d[np.newaxis, :]
 	else:
