@@ -6,7 +6,7 @@ import numpy as np
 import cv2
 
 import textwrap
-import image_utils
+from cnn_utils import image_utils
 import PIL
 from PIL import Image, ImageDraw, ImageFont
 import matplotlib as mpl
@@ -82,7 +82,6 @@ def label_ims(ims_batch, labels=None,
 		X_flat = np.reshape(ims_batch, (ims_batch.shape[0], -1))
 		X_orig_min = np.min(X_flat, axis=1)
 		X_orig_max = np.max(X_flat, axis=1)
-		print('Min {}, max {}'.format(np.min(X_flat),np.max(X_flat)))
 		X_flat = X_flat - np.tile(np.min(X_flat, axis=1, keepdims=True), (1, flattened_dims))
 		X_flat = X_flat / np.tile(np.max(X_flat, axis=1, keepdims=True), (1, flattened_dims))
 		ims_batch = np.reshape(X_flat, ims_batch.shape)

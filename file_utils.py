@@ -85,7 +85,12 @@ def make_output_dirs(base_model_name, prompt_delete=True, exp_root ='./experimen
 				'Remove \n\t{} figures from {}\n\t{} logs from {}\n\t{} models from {}?\n[y]es / [n]o (create new folder) / [C]ontinue existing / remove [m]odels too: [y/n/C/m]'.format(
 					len(figure_files), figures_dir, len(log_files), logs_dir, len(model_files), models_dir))
 
-			choice = raw_input().lower()
+			try:
+				choice = raw_input().lower()
+			except NameError:
+				# python 3 syntax
+				choice = input().lower()
+
 			#			if len(choice) == 0:
 			#				choice=['yes']
 			remove_choices = ['yes', 'y', 'ye']
