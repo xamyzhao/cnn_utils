@@ -19,7 +19,7 @@ import scipy.misc as spm
 def label_ims(ims_batch, labels=None,
               inverse_normalize=False,
               normalize=False,
-              clip_flow=10, display_h=128, pad_top=None,
+              clip_flow=10, display_h=128, pad_top=None, clip_norm=None,
               color_space='rgb', concat_axis=0):
 	'''
 	Displays a batch of matrices as an image.
@@ -39,10 +39,14 @@ def label_ims(ims_batch, labels=None,
 	batch_size = ims_batch.shape[0]
 	h = ims_batch.shape[1]
 	w = ims_batch.shape[2]
+	if len(ims_batch.shape) == 3:
+		n_chans = 1
+	else:
+		n_chans = ims_batch.shape[-1]
 
 	if type(labels) == list and len(labels) == 1:  # only label the first image
 		labels = labels + [''] * (batch_size - 1)
-	elif not type(labels) == list and not type(labels) == np.ndarray:
+	elif labels is not None and not type(labels) == list and not type(labels) == np.ndarray:
 		labels = [labels] * batch_size
 
 	scale_factor = display_h / float(h)
@@ -55,10 +59,10 @@ def label_ims(ims_batch, labels=None,
 	if len(ims_batch.shape) < 4:
 		ims_batch = np.expand_dims(ims_batch, 3)
 
-	if ims_batch.shape[3] == 2:  # assume to be x,y flow; map to color im
+	if ims_batch.shape[-1] == 2:  # assume to be x,y flow; map to color im
 		X_fullcolor = np.concatenate([ims_batch.copy(), np.zeros(ims_batch.shape[:-1] + (1,))], axis=3)
 
-		if labels is None or len(labels) == 0:
+		if labels is not None:
 			labels = [''] * batch_size
 
 		for i in range(batch_size):
@@ -79,21 +83,36 @@ def label_ims(ims_batch, labels=None,
 
 	elif normalize:
 		flattened_dims = np.prod(ims_batch.shape[1:])
+
+		X_spatially_flat = np.reshape(ims_batch, (ims_batch.shape[0], -1, n_chans))
+		X_orig_min = np.min(X_spatially_flat, axis=1)
+		X_orig_max = np.max(X_spatially_flat, axis=1)
+
+		# now actually flatten and normalize across channels
 		X_flat = np.reshape(ims_batch, (ims_batch.shape[0], -1))
-		X_orig_min = np.min(X_flat, axis=1)
-		X_orig_max = np.max(X_flat, axis=1)
-		X_flat = X_flat - np.tile(np.min(X_flat, axis=1, keepdims=True), (1, flattened_dims))
-		X_flat = X_flat / np.tile(np.max(X_flat, axis=1, keepdims=True), (1, flattened_dims))
+		if clip_norm is None:
+			X_flat = X_flat - np.tile(np.min(X_flat, axis=1, keepdims=True), (1, flattened_dims))
+			# avoid dividing by 0
+			X_flat = X_flat / np.clip(np.tile(np.max(X_flat, axis=1, keepdims=True), (1, flattened_dims)), 1e-5, None)
+		else:
+			X_flat = X_flat - (-float(clip_norm))
+			# avoid dividing by 0
+			X_flat = X_flat / (2. * clip_norm)
+			#X_flat = X_flat - np.tile(np.min(X_flat, axis=1, keepdims=True), (1, flattened_dims))
+			# avoid dividing by 0
+			#X_flat = X_flat / np.clip(np.tile(np.max(X_flat, axis=1, keepdims=True), (1, flattened_dims)), 1e-5, None)
+			
 		ims_batch = np.reshape(X_flat, ims_batch.shape)
-		ims_batch = np.clip(ims_batch, 0., 1.)
+		ims_batch = np.clip(ims_batch.astype(np.float32), 0., 1.)
 		for i in range(batch_size):
-			if labels[i] is not None:
-				labels[i] = '{},'.format(labels[i])
-			else:
-				labels[i] = ''
-			# show the min, max of each channel
-			for c in range(ims_batch.shape[3]):
-				labels[i] += '({}, {})'.format(round(X_orig_min[i], 2), round(X_orig_max[i], 2))
+			if labels is not None and len(labels) > 0:
+				if labels[i] is not None:
+					labels[i] = '{},'.format(labels[i])
+				else:
+					labels[i] = ''
+				# show the min, max of each channel
+				for c in range(n_chans):
+					labels[i] += '({:.2f}, {:.2f})'.format(round(X_orig_min[i, c], 2), round(X_orig_max[i, c], 2))
 	else:
 		ims_batch = np.clip(ims_batch, 0., 1.)
 
@@ -125,11 +144,11 @@ def label_ims(ims_batch, labels=None,
 			curr_im = np.concatenate([np.zeros((pad_top, curr_im.shape[1], curr_im.shape[2])), curr_im], axis=0)
 		out_im.append(curr_im)
 
-	out_im = np.concatenate(out_im, axis=concat_axis)
+	out_im = np.concatenate(out_im, axis=concat_axis).astype(np.uint8)
 	font_size = 15
 	max_text_width = int(17 * display_h / 128.)  # empirically determined
-	if len(labels) > 0:
-		im_pil = Image.fromarray(out_im.astype(np.uint8))
+	if labels is not None and len(labels) > 0:
+		im_pil = Image.fromarray(out_im)
 		draw = ImageDraw.Draw(im_pil)
 		for i in range(batch_size):
 			if len(labels) > i:  # if we have a label for this image
@@ -161,6 +180,7 @@ def label_ims(ims_batch, labels=None,
 							draw.text((5 + i * im_h, 5 + 14 * li), line, font=font, fill=(50, 50, 255))
 
 		out_im = np.asarray(im_pil)
+	
 	return out_im
 
 

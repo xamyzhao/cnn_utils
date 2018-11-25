@@ -8,8 +8,8 @@ import argparse
 import time
 import datetime
 
-num_models_to_keep = 3
-num_figs_to_keep = 3
+num_models_to_keep = 8
+num_figs_to_keep = 8
 
 
 def keep_closest_to_milestones(milestone_interval, nums_to_remove):
@@ -27,7 +27,7 @@ def keep_closest_to_milestones(milestone_interval, nums_to_remove):
 
 def remove_all_but_milestones_and_recent( in_dir, file_exts, num_prefix, milestone_interval, num_recent_to_keep = 3, test=False ):
 	files = [ os.path.join( in_dir, f) for f in os.listdir( in_dir ) if np.any( [f.endswith(e) for e in file_exts])  \
-									if re.search('(?<={})[0-9]*'.format( num_prefix),f) is not None ]
+									if re.search('(?<={})[0-9]*'.format( num_prefix),f) is not None and 'test' not in f ]
 
 	file_times = [ datetime.datetime.fromtimestamp( os.path.getmtime(f)) for f in files ]
 	nums = [ int(re.search('(?<={})[0-9]*'.format( num_prefix ), os.path.basename(f) ).group(0)) for f in files ]

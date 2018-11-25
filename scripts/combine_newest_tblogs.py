@@ -15,7 +15,7 @@ if __name__ == '__main__':
 	ap.add_argument('min_h',type=float,default=24, nargs='?')
 	ap.add_argument('-repeat_every',type=float,default=60, nargs='?')
 	args = ap.parse_args()
-	print args.min_h
+	print(args.min_h)
 
 #	while True:
 #		log_dirs = [ os.path.join(figures_dir,d) for d in os.listdir(figures_dir) if os.path.isdir( os.path.join( figures_dir, d) )]
