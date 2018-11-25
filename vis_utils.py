@@ -119,7 +119,9 @@ def label_ims(ims_batch, labels=None,
 			interp = cv2.INTER_NEAREST
 		else:
 			interp = cv2.INTER_LINEAR
-		curr_im = cv2.resize(curr_im, None, fx=scale_factor, fy=scale_factor, interpolation=interp)
+
+		if not scale_factor == 1:
+			curr_im = cv2.resize(curr_im, None, fx=scale_factor, fy=scale_factor, interpolation=interp)
 
 		if pad_top:
 			curr_im = np.concatenate([np.zeros((pad_top, curr_im.shape[1], curr_im.shape[2])), curr_im], axis=0)
@@ -194,11 +196,15 @@ def xy_flow_to_im_cmap(flow):
 	n_vals = 256
 	cm = make_cmap_rainbow(n_vals)
 
-	flow_mag = np.sqrt(flow[:, :, 0] ** 2 + flow[:, :, 1] ** 2)
+	flow_mag = np.sqrt(np.sum(flow ** 2, axis=-1))
 	flow_mag /= np.max(flow_mag)
 	flow_angle = np.arctan2(flow[:, :, 1], flow[:, :, 0])
+	flow_angle /= np.max(flow_angle)
+	flow_angle *= (n_vals - 1)
 
-	flow_angle_binned = np.digitize(flow_angle, np.linspace(0, 255, n_vals + 1))
+	# put the angle into bins
+	flow_angle_binned = np.digitize(flow_angle, np.linspace(0, n_vals-1, n_vals), right=True)
+	print(np.max(flow_angle_binned))
 
 	flow_im = cm[flow_angle_binned]
 
@@ -267,9 +273,11 @@ def flow_to_grid(flow, spacing=10):
 	x = np.linspace(0, w, w, endpoint=False)
 	y = np.linspace(0, h, h, endpoint=False)
 	xx, yy = np.meshgrid(x, y)
-	sample = flow + np.concatenate([np.expand_dims(xx, axis=-1), np.expand_dims(yy, axis=-1)], axis=-1)
+
+	sample = flow[..., :2] + np.concatenate([np.expand_dims(xx, axis=-1), np.expand_dims(yy, axis=-1)], axis=-1)
+
 	grid_warped = interpolate.interpn((y, x), grid, sample, bounds_error=False, fill_value=0)
-	return np.reshape(grid_warped, grid.shape)
+	return np.reshape(grid_warped, grid.shape), grid
 
 if __name__ == '__main__':
 	warped = flow_to_grid(np.zeros((100, 100, 2)))
