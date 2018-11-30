@@ -46,6 +46,26 @@ def filenames_to_im_ids( im_files ):
 	return im_file_ids
 
 
+def prompt_rename(old_dir, new_dir):
+	print('Rename dir {} to {} [y/N]?'.format(old_dir, new_dir))
+
+	try:
+		choice = raw_input().lower()
+	except NameError:
+		# python 3 syntax
+		choice = input().lower()
+
+
+	rename_choices = ['yes', 'y', 'ye']
+	keep_choices = ['no', 'n']
+
+	if choice in rename_choices:
+		os.rename(old_dir, new_dir)
+		return new_dir
+	else:
+		return old_dir
+
+
 def make_output_dirs(base_model_name, prompt_delete=True, exp_root ='./experiments/', exp_dir=None):
 	fig_root = './figures/'
 	log_root = './logs/'
