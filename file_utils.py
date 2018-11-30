@@ -12,10 +12,12 @@ import numpy as np
 def filenames_to_im_ids( im_files ):
 	if isinstance(im_files[0], int):
 		return im_files
-	elif im_files[0].startswith('frame'):
-		im_file_ids = [ int( os.path.splitext(os.path.basename(f))[0].split('_')[1] ) for f in im_files ]
+	elif 'frame_' in im_files[0]:
+		im_file_ids = [int(re.search('(?<=frame_)[0-9]*', f).group(0)) for f in im_files]
 		return im_file_ids
-
+	elif 'frame' in im_files[0]:
+		im_file_ids = [int(re.search('(?<=frame)[0-9]*', f).group(0)) for f in im_files]
+		return im_file_ids
 	try:
 		int(im_files[0])
 		im_file_ids = [ int( os.path.splitext(os.path.basename(f))[0] ) for f in im_files ]
@@ -44,18 +46,21 @@ def filenames_to_im_ids( im_files ):
 	return im_file_ids
 
 
-def make_output_dirs(base_model_name, prompt_delete=True, exp_root ='./experiments/'):
+def make_output_dirs(base_model_name, prompt_delete=True, exp_root ='./experiments/', exp_dir=None):
 	fig_root = './figures/'
 	log_root = './logs/'
 	model_root = './models/'
 
-	experiment_dir = exp_root + base_model_name
+	if exp_dir is None:
+		exp_dir = exp_root + base_model_name
+		model_name = base_model_name
+	else:
+		model_name = os.path.basename(exp_dir)
 
-	figures_dir = exp_root + base_model_name + '/figures'
-	logs_dir = exp_root + base_model_name + '/logs'
-	models_dir = exp_root + base_model_name + '/models'
+	figures_dir = os.path.join(exp_dir, 'figures')
+	logs_dir = os.path.join(exp_dir, 'logs')
+	models_dir = os.path.join(exp_dir, 'models')
 
-	model_name = base_model_name
 	copy_count = 0
 
 	while os.path.isdir(figures_dir) or os.path.isdir(logs_dir) or os.path.isdir(models_dir):
@@ -69,7 +74,7 @@ def make_output_dirs(base_model_name, prompt_delete=True, exp_root ='./experimen
 		if os.path.isdir(logs_dir):
 			log_files = [os.path.join(logs_dir, l) for l in os.listdir(logs_dir) \
 						 if os.path.isfile(os.path.join(logs_dir, l))] \
-						+ [os.path.join(experiment_dir, f) for f in os.listdir(experiment_dir) if f.endswith('.log')]
+						+ [os.path.join(exp_dir, f) for f in os.listdir(exp_dir) if f.endswith('.log')]
 			# also includde any .log files
 		else:
 			log_files = []
@@ -114,7 +119,7 @@ def make_output_dirs(base_model_name, prompt_delete=True, exp_root ='./experimen
 			elif choice in make_new_choices:
 				copy_count += 1
 				model_name = base_model_name + '_{}'.format(copy_count)
-				experiment_dir = exp_root + model_name
+				exp_dir = exp_root + model_name
 
 				figures_dir = exp_root + model_name + '/figures'
 				logs_dir = exp_root + model_name + '/logs'
@@ -122,15 +127,15 @@ def make_output_dirs(base_model_name, prompt_delete=True, exp_root ='./experimen
 		else:
 			break
 
-	if not os.path.isdir(experiment_dir):
-		os.mkdir(experiment_dir)
+	if not os.path.isdir(exp_dir):
+		os.mkdir(exp_dir)
 	if not os.path.isdir(figures_dir):
 		os.mkdir(figures_dir)
 	if not os.path.isdir(logs_dir):
 		os.mkdir(logs_dir)
 	if not os.path.isdir(models_dir):
 		os.mkdir(models_dir)
-	return model_name, experiment_dir, figures_dir, logs_dir, models_dir
+	return model_name, exp_dir, figures_dir, logs_dir, models_dir
 
 def _test_make_output_dirs():
 	model_name = '_test_make_output_dirs'

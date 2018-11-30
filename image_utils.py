@@ -11,6 +11,7 @@ def pad_or_crop_to_shape(I, out_shape, border_color=(255, 255, 255)):
 		border_color = tuple([border_color] * n_chans)
 
 	border_size = (out_shape[0] - I.shape[0], out_shape[1] - I.shape[1])
+
 	if border_size[0] > 0:
 		I = cv2.copyMakeBorder(I,
 		                       int(math.floor(border_size[0] / 2.0)),
