@@ -74,8 +74,13 @@ def make_output_dirs(base_model_name, prompt_delete=True, exp_root ='./experimen
 	if exp_dir is None:
 		exp_dir = exp_root + base_model_name
 		model_name = base_model_name
-	else:
+	elif os.path.basename(exp_dir).startswith(base_model_name):
+		# likely another instance of the same model name
 		model_name = os.path.basename(exp_dir)
+	else:
+		exp_dir = prompt_rename(exp_dir, os.path.join(exp_root, base_model_name))
+		model_name = os.path.basename(exp_dir)
+		prompt_delete = True
 
 	figures_dir = os.path.join(exp_dir, 'figures')
 	logs_dir = os.path.join(exp_dir, 'logs')
