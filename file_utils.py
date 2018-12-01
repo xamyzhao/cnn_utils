@@ -46,7 +46,7 @@ def filenames_to_im_ids( im_files ):
 	return im_file_ids
 
 
-def prompt_rename(old_dir, new_dir):
+def _prompt_rename(old_dir, new_dir):
 	print('Rename dir {} to {} [y/N]?'.format(old_dir, new_dir))
 
 	try:
@@ -60,7 +60,7 @@ def prompt_rename(old_dir, new_dir):
 	keep_choices = ['no', 'n']
 
 	if choice in rename_choices:
-		os.rename(old_dir, new_dir)
+#		os.rename(old_dir, new_dir)
 		return new_dir
 	else:
 		return old_dir
@@ -71,6 +71,7 @@ def make_output_dirs(base_model_name, prompt_delete=True, exp_root ='./experimen
 	log_root = './logs/'
 	model_root = './models/'
 
+	do_rename = False
 	if exp_dir is None:
 		exp_dir = exp_root + base_model_name
 		model_name = base_model_name
@@ -78,8 +79,12 @@ def make_output_dirs(base_model_name, prompt_delete=True, exp_root ='./experimen
 		# likely another instance of the same model name
 		model_name = os.path.basename(exp_dir)
 	else:
-		exp_dir = prompt_rename(exp_dir, os.path.join(exp_root, base_model_name))
+		old_exp_dir = exp_dir
+		exp_dir = _prompt_rename(exp_dir, os.path.join(exp_root, base_model_name))
 		model_name = os.path.basename(exp_dir)
+		do_rename = True
+
+		# we might have changed the model name to something that exists, so prompt if so
 		prompt_delete = True
 
 	figures_dir = os.path.join(exp_dir, 'figures')
@@ -152,14 +157,19 @@ def make_output_dirs(base_model_name, prompt_delete=True, exp_root ='./experimen
 		else:
 			break
 
-	if not os.path.isdir(exp_dir):
-		os.mkdir(exp_dir)
-	if not os.path.isdir(figures_dir):
-		os.mkdir(figures_dir)
-	if not os.path.isdir(logs_dir):
-		os.mkdir(logs_dir)
-	if not os.path.isdir(models_dir):
-		os.mkdir(models_dir)
+	if do_rename:
+		# simply renaming the existing old_exp_dir to exp_dir, rather than creating a new one
+		os.rename(old_exp_dir, exp_dir)
+	else:
+		if not os.path.isdir(exp_dir):
+			os.mkdir(exp_dir)
+		if not os.path.isdir(figures_dir):
+			os.mkdir(figures_dir)
+		if not os.path.isdir(logs_dir):
+			os.mkdir(logs_dir)
+		if not os.path.isdir(models_dir):
+			os.mkdir(models_dir)
+
 	return model_name, exp_dir, figures_dir, logs_dir, models_dir
 
 def _test_make_output_dirs():

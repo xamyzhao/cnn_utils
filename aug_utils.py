@@ -31,7 +31,6 @@ def make_affine_matrix_batch(
 
 	if len(scales.shape) == 1:  # same scale for both dims
 		scales = np.tile(np.expand_dims(scales, axis=-1), (1, 2))
-
 	T = np.zeros((batch_size, 2, 3))
 
 	flip_horiz_factor = np.ones((batch_size,))
@@ -47,7 +46,6 @@ def make_affine_matrix_batch(
 	shear_mat[:, 1, 1] = 1
 	shear_mat[:, 0, 1] = shear_x
 	shear_mat[:, 1, 0] = shear_y
-
 	# rotation and scaling
 	T[:, 0, 0] = np.cos(thetas) * scales[:, 0] * flip_horiz_factor
 	T[:, 0, 1] = -np.sin(thetas)
@@ -86,9 +84,15 @@ def aug_params_to_transform_matrices(
 		max_shear = (max_shear, max_shear)
 
 	thetas = np.pi * (np.random.rand(batch_size) * max_rot * 2. - max_rot) / 180.
-	scales = np.random.rand(batch_size) * (scale_range[1] - scale_range[0]) + scale_range[0]
+
+	if scale_range[1] > scale_range[0]:
+		scales = np.random.rand(batch_size) * (scale_range[1] - scale_range[0]) + scale_range[0]
+	else:
+		scales = None
+
 	trans_x = np.random.rand(batch_size) * max_trans[0] * 2. - max_trans[0]
 	trans_y = np.random.rand(batch_size) * max_trans[1] * 2. - max_trans[1]
+
 	shear_x = np.random.rand(batch_size) * max_shear[0] * 2. - max_shear[0]
 	shear_y = np.random.rand(batch_size) * max_shear[1] * 2. - max_shear[1]
 
