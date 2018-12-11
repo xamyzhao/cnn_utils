@@ -1,6 +1,5 @@
-# evolving-wilds
+# evolving_wilds
 A library of CNN utilities for computer vision projects.
-
 
 <sub>As always, inspired by Magic: The Gathering.</sub>
 
