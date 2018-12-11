@@ -71,6 +71,7 @@ def aug_params_to_transform_matrices(
 		max_trans=(0, 0),  # x, y
 		max_shear=(0, 0),
 		apply_flip=(False, False),
+		integer_values=False,
 	):
 	if not isinstance(scale_range, tuple) and not isinstance(scale_range,list):
 		scale_range = (1 - scale_range, 1 + scale_range)
@@ -111,6 +112,9 @@ def aug_params_to_transform_matrices(
 		shear_x, shear_y,
 		do_flip_horiz, do_flip_vert
 	)
+
+	if integer_values:
+		T = np.round(T).astype(int)
 
 	return T
 
