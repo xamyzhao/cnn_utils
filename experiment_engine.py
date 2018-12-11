@@ -12,10 +12,9 @@ import tensorflow as tf
 from tensorflow.python.client import timeline
 
 import my_callbacks
-import network_utils
 
 
-def setup(args):
+def configure_gpus(args):
 	# set gpu id and tf settings
 	os.environ['CUDA_VISIBLE_DEVICES'] = ','.join([str(g) for g in args.gpu])
 	config = tf.ConfigProto(allow_soft_placement=True)
@@ -266,7 +265,7 @@ def train_batch_by_batch(
 			if bi == n_batch_per_epoch_train - 1:
 				training_logger = file_logger
 
-			network_utils.log_losses(pb, tbw, training_logger,
+			log_losses(pb, tbw, training_logger,
 			                         disc_loss_names + joint_loss_names,
 			                         disc_loss + joint_loss,
 			                         batch_count)
@@ -331,7 +330,7 @@ def train_batch_by_batch(
 
 			test_loss, test_loss_names = exp.test_joint()
 
-			network_utils.log_losses(pbt, None, file_logger,
+			log_losses(pbt, None, file_logger,
 			                         test_loss_names, test_loss,
 			                         e * n_batch_per_epoch_train + bi)
 
@@ -339,7 +338,7 @@ def train_batch_by_batch(
 			if results_im is not None:
 				cv2.imwrite(os.path.join(exp.figures_dir, 'test_epoch{}_batch{}.jpg'.format(e, bi)), results_im)
 
-			network_utils.log_losses(None, tbw, file_logger,
+			log_losses(None, tbw, file_logger,
 			                         test_loss_names, test_loss,
 			                         e * n_batch_per_epoch_train + bi)
 
@@ -357,12 +356,15 @@ def log_losses(progressBar, tensorBoardWriter, logger, loss_names, loss_vals, it
 	if not isinstance(loss_vals, list):  # occurs when model only has one loss
 		loss_vals = [loss_vals]
 
+	# update the progress bar displayed in stdout
 	if progressBar is not None:
 		progressBar.add(1, values=[(loss_names[i], loss_vals[i]) for i in range(len(loss_vals))])
 
+	# write to log using python logging
 	if logger is not None:
 		logger.debug(', '.join(['{}: {}'.format(loss_names[i], loss_vals[i]) for i in range(len(loss_vals))]))
 
+	# write to tensorboard for pretty plots
 	if tensorBoardWriter is not None:
 		for i in range(len(loss_names)):
 			tensorBoardWriter.add_summary(
