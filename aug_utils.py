@@ -7,7 +7,7 @@ import sys
 
 import image_utils
 import cv2
-sys.path.append('../cnn_utils')
+sys.path.append('../evolving-wilds')
 
 from augmentation_functions import augSaturation,augBlur,augNoise,augScale,augRotate,randScale,randRot, augProjective, randFlip, augFlip,  augShift, rand_colorspace, rand_channels, augCrop
 #import sampling_utils

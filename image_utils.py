@@ -5,7 +5,10 @@ import numpy as np
 from scipy.ndimage import morphology as spndm
 
 
-def pad_or_crop_to_shape(I, out_shape, border_color=(255, 255, 255)):
+def pad_or_crop_to_shape(
+		I,
+        out_shape,
+		border_color=(255, 255, 255)):
 	if not isinstance(border_color, tuple):
 		n_chans = I.shape[-1]
 		border_color = tuple([border_color] * n_chans)

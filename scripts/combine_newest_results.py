@@ -43,6 +43,6 @@ if __name__ == '__main__':
 			latest_dirs = [ d for d in latest_dirs if np.all( [ft in d for ft in args.filter] )]
 		model_names = [ os.path.basename( os.path.split( ld )[0] ) for ld in latest_dirs ]
 		print(model_names) 
-		os.system('python ~/cnn_utils/scripts/combine_images.py {} -out_names {}'.format( ' '.join(latest_dirs), ' '.join(model_names)))
+		os.system('python ~/evolving-wilds/scripts/combine_images.py {} -out_names {}'.format( ' '.join(latest_dirs), ' '.join(model_names)))
 		time.sleep(args.repeat_every)
 				
