@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-import image_utils
+from cnn_utils import image_utils
 
 
 # import mnist_data_utils

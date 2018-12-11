@@ -6,12 +6,12 @@ import time
 
 import cv2
 import keras.backend as K
-from keras.utils import generic_utils
 import numpy as np
 import tensorflow as tf
+from keras.utils import generic_utils
 from tensorflow.python.client import timeline
 
-import my_callbacks
+from cnn_utils import my_callbacks
 
 
 def configure_gpus(args):

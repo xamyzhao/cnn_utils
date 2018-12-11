@@ -1,11 +1,11 @@
-from keras import callbacks
-import keras.utils.generic_utils as keras_generic_utils
-import tensorflow as tf
-import data_utils, vis_utils
-import cv2
-import numpy as np
 import os
 import time
+
+import cv2
+import keras.utils.generic_utils as keras_generic_utils
+import tensorflow as tf
+from keras import callbacks
+
 
 class EveryNEpochs(callbacks.Callback):
 	def __init__(self, call_every_n_epochs, do_fn, start_epoch=0, start_iter=0, 

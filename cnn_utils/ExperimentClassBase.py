@@ -3,9 +3,10 @@ import logging
 import os
 import sys
 
-import file_utils
 import numpy as np
 from keras.utils import plot_model
+
+from cnn_utils import file_utils
 
 
 class Experiment(object):
