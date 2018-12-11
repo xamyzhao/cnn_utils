@@ -184,6 +184,8 @@ class Experiment(object):
 			self.profiler_logger.handlers = []
 			self.profiler_logger.setLevel(logging.DEBUG)
 			self.profiler_logger.addHandler(lfh)
+		else:
+			self.profiler_logger = None
 
 	def _reopen_log_file(self):
 		if self.logger is not None:

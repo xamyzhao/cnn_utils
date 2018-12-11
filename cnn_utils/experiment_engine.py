@@ -24,7 +24,7 @@ def configure_gpus(args):
 
 
 def run_experiment(exp, run_args,
-                   end_epoch, save_every_n_epochs, test_every_n_epochs):
+                   end_epoch, save_every_n_epochs, test_every_n_epochs, early_stopping_eps=None):
 	if run_args.debug:
 		if run_args.epoch is not None:
 			end_epoch = int(run_args.epoch) + 10
@@ -82,15 +82,21 @@ def run_experiment(exp, run_args,
 		train_using_fit_generator(
 			exp=exp, batch_size=run_args.batch_size,
 			start_epoch=start_epoch, end_epoch=end_epoch,
+			save_every_n_epochs=save_every_n_epochs,
+			test_every_n_epochs=test_every_n_epochs,
 			tbw=tbw, file_stdout_logger=file_stdout_logger, file_logger=file_logger,
-			run_args=run_args
+			run_args=run_args,
+			early_stopping_eps=early_stopping_eps
 		)
 	else:
 		train_batch_by_batch(
 			exp=exp, batch_size=run_args.batch_size,
 			start_epoch=start_epoch, end_epoch=end_epoch,
+			save_every_n_epochs=save_every_n_epochs,
+			test_every_n_epochs=test_every_n_epochs,
 			tbw=tbw, file_stdout_logger=file_stdout_logger, file_logger=file_logger,
-			run_args=run_args
+			run_args=run_args,
+			early_stopping_eps=early_stopping_eps
 		)
 
 	return exp_dir

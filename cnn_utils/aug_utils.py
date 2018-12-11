@@ -2,12 +2,11 @@
 import sys
 
 import cv2
-import image_utils
 import numpy as np
 import scipy.ndimage as spnd
 
 sys.path.append('../evolving_wilds')
-
+from cnn_utils import image_utils
 from cnn_utils.augmentation_functions import augSaturation,augBlur,augNoise,augScale,augRotate,randScale, augProjective, randFlip, augFlip,  augShift, rand_colorspace, rand_channels, augCrop
 #import sampling_utils
 
