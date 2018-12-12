@@ -7,10 +7,17 @@ import numpy as np
 import tensorflow as tf
 from scipy.signal import convolve2d
 
+def norm_vgg(x):
+	import tensorflow as tf
+	x_norm = tf.sqrt(tf.reduce_sum(x * x, axis=-1, keep_dims=True))
+	x_norm = tf.divide(x, x_norm)
+	return x_norm
+
 #from networks import affine_networks
 #from networks import transform_network_utils
 from keras.layers import Lambda
 def vgg_loss_fcn(feat_net, y_true, y_pred):
+	import tensorflow as tf
 	# just preprocess as a part of the model
 	n_feature_layers = len(feat_net.outputs)
 	x1 = feat_net(y_true)
@@ -23,11 +30,13 @@ def vgg_loss_fcn(feat_net, y_true, y_pred):
 		x2_l = x2[li]
 
 		# unit normalize in channels dimension
-		x1_norm = tf.sqrt(tf.reduce_sum(x1_l * x1_l, axis=-1, keep_dims=True))  # b x h x w x 1
-		x2_norm = tf.sqrt(tf.reduce_sum(x2_l * x2_l, axis=-1, keep_dims=True))
+		#x1_norm = tf.sqrt(tf.reduce_sum(x1_l * x1_l, axis=-1, keep_dims=True))  # b x h x w x 1
+		#x2_norm = tf.sqrt(tf.reduce_sum(x2_l * x2_l, axis=-1, keep_dims=True))
 
-		x1_l_norm = tf.divide(x1_l, x1_norm)  # b x h x w x c
-		x2_l_norm = tf.divide(x2_l, x2_norm)
+		#x1_l_norm = tf.divide(x1_l, x1_norm)  # b x h x w x c
+		#x2_l_norm = tf.divide(x2_l, x2_norm)
+		x1_l_norm = norm_vgg(x1_l)
+		x2_l_norm = norm_vgg(x2_l)
 
 		hw = tf.shape(x1_l)[1] * tf.shape(x1_l)[2]
 
