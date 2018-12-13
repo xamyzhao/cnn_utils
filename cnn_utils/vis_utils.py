@@ -191,14 +191,21 @@ def label_ims(ims_batch, labels=None,
 	return out_im
 
 
-def pad_images_to_size(ims_list, pad_to_im_idx=None, pad_val=0.):
+def pad_images_to_size(ims_list, pad_to_im_idx=None, ignore_axes=None, pad_val=0.):
 	if pad_to_im_idx is not None:
 		pad_to_shape = ims_list[pad_to_im_idx].shape
 	else:
 		im_shapes = np.reshape([im.shape for im in ims_list], (len(ims_list), -1))
-		pad_to_shape = np.max(im_shapes, axis=0)
+		pad_to_shape = np.max(im_shapes, axis=0).tolist()
 
-	ims_list = [image_utils.pad_or_crop_to_shape(im, pad_to_shape, border_color=pad_val) for i, im in enumerate(ims_list)]
+	if ignore_axes is not None:
+		if not isinstance(ignore_axes, list):
+			ignore_axes = [ignore_axes]
+		for a in ignore_axes:
+			pad_to_shape[a] = None
+
+	ims_list = [image_utils.pad_or_crop_to_shape(im, pad_to_shape, border_color=pad_val) \
+		for i, im in enumerate(ims_list)]
 	return ims_list
 
 

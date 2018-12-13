@@ -9,11 +9,14 @@ def pad_or_crop_to_shape(
 		I,
         out_shape,
 		border_color=(255, 255, 255)):
+
 	if not isinstance(border_color, tuple):
 		n_chans = I.shape[-1]
 		border_color = tuple([border_color] * n_chans)
 
-	border_size = (out_shape[0] - I.shape[0], out_shape[1] - I.shape[1])
+	# an out_shape with a dimension value of None means just don't crop or pad in that dim
+	border_size = [out_shape[d] - I.shape[d] if out_shape[d] is not None else 0 for d in range(2)]
+	#border_size = (out_shape[0] - I.shape[0], out_shape[1] - I.shape[1])
 
 	if border_size[0] > 0:
 		I = cv2.copyMakeBorder(I,
