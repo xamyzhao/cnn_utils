@@ -186,6 +186,17 @@ def label_ims(ims_batch, labels=None,
 	return out_im
 
 
+def pad_images_to_size(ims_list, pad_to_im_idx=None, pad_val=0.):
+	if pad_to_im_idx is not None:
+		pad_to_shape = ims_list[pad_to_im_idx].shape
+	else:
+		im_shapes = np.reshape([im.shape for im in ims_list], (len(ims_list), -1))
+		pad_to_shape = np.max(im_shapes, axis=0)
+
+	ims_list = [image_utils.pad_or_crop_to_shape(im, pad_to_shape, border_color=pad_val) for i, im in enumerate(ims_list)]
+	return ims_list
+
+
 def flow_to_im(flow, clip_flow=None):
 	out_flow = np.zeros(flow.shape[:-1] + (3,))
 
