@@ -36,6 +36,11 @@ def label_ims(ims_batch, labels=None,
 
 	:return:
 	'''
+
+	if len(ims_batch.shape) == 3 and ims_batch.shape[-1] == 3:
+		# already an image
+		return ims_batch
+	
 	batch_size = ims_batch.shape[0]
 	h = ims_batch.shape[1]
 	w = ims_batch.shape[2]
