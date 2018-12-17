@@ -7,6 +7,23 @@ from cnn_utils import image_utils
 # import mnist_data_utils
 
 
+def erode_batch(X, ks):
+	ks = int(ks)
+	n = X.shape[0]
+	h = X.shape[1]
+	w = X.shape[2]
+	c = X.shape[3]
+	X_temp = np.transpose(X, (1, 2, 3, 0))
+	X_temp = np.reshape(X_temp, (h, w, -1))
+	kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ks, ks))
+	#	X_temp = cv2.resize( X_temp, None, fx=scale_factor, fy=scale_factor )
+	X_temp = cv2.erode(X_temp, kernel)
+	h_new = X_temp.shape[0]
+	w_new = X_temp.shape[1]
+	X_out = np.reshape(X_temp, (h_new, w_new, c, n))
+	X_out = np.transpose(X_out, (3, 0, 1, 2))
+	return X_out
+
 def dilate_batch(X, ks):
 	ks = int(ks)
 	n = X.shape[0]

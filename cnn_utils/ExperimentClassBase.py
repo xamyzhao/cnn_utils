@@ -206,6 +206,7 @@ class Experiment(object):
 
 	def train_discriminator(self):
 		print('train_discriminator not implemented')
+		return [], []
 
 	def train_joint(self):
 		print('train_joint not implemented')

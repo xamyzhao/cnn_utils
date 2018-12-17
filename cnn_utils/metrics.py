@@ -16,39 +16,43 @@ def norm_vgg(x):
 #from networks import affine_networks
 #from networks import transform_network_utils
 from keras.layers import Lambda
-def vgg_loss_fcn(feat_net, y_true, y_pred):
-	import tensorflow as tf
-	# just preprocess as a part of the model
-	n_feature_layers = len(feat_net.outputs)
-	x1 = feat_net(y_true)
-	x2 = feat_net(y_pred)
+class VggFeatLoss(object):
+	def __init__(self, feat_net):
+		self.feat_net = feat_net
 
-	loss = []
+	def compute_loss(self, y_true, y_pred):
+		import tensorflow as tf
+		# just preprocess as a part of the model
+		n_feature_layers = len(self.feat_net.outputs)
+		x1 = self.feat_net(y_true)
+		x2 = self.feat_net(y_pred)
 
-	for li in range(n_feature_layers):
-		x1_l = x1[li]
-		x2_l = x2[li]
+		loss = []
 
-		# unit normalize in channels dimension
-		#x1_norm = tf.sqrt(tf.reduce_sum(x1_l * x1_l, axis=-1, keep_dims=True))  # b x h x w x 1
-		#x2_norm = tf.sqrt(tf.reduce_sum(x2_l * x2_l, axis=-1, keep_dims=True))
+		for li in range(n_feature_layers):
+			x1_l = x1[li]
+			x2_l = x2[li]
 
-		#x1_l_norm = tf.divide(x1_l, x1_norm)  # b x h x w x c
-		#x2_l_norm = tf.divide(x2_l, x2_norm)
-		x1_l_norm = norm_vgg(x1_l)
-		x2_l_norm = norm_vgg(x2_l)
+			# unit normalize in channels dimension
+			#x1_norm = tf.sqrt(tf.reduce_sum(x1_l * x1_l, axis=-1, keep_dims=True))  # b x h x w x 1
+			#x2_norm = tf.sqrt(tf.reduce_sum(x2_l * x2_l, axis=-1, keep_dims=True))
 
-		hw = tf.shape(x1_l)[1] * tf.shape(x1_l)[2]
+			#x1_l_norm = tf.divide(x1_l, x1_norm)  # b x h x w x c
+			#x2_l_norm = tf.divide(x2_l, x2_norm)
+			x1_l_norm = norm_vgg(x1_l)
+			x2_l_norm = norm_vgg(x2_l)
 
-		d = tf.reduce_sum(tf.square(x1_l_norm - x2_l_norm), [1, 2, 3])  # bx1
-		d_mean = tf.divide(d, tf.cast(hw, tf.float32))
+			hw = tf.shape(x1_l)[1] * tf.shape(x1_l)[2]
 
-		if li == 0:
-			loss = d_mean
-		else:
-			loss = loss + d_mean
-	print('vgg loss shape: {}'.format(loss.get_shape()))
-	return loss
+			d = tf.reduce_sum(tf.square(x1_l_norm - x2_l_norm), [1, 2, 3])  # bx1
+			d_mean = tf.divide(d, tf.cast(hw, tf.float32))
+
+			if li == 0:
+				loss = d_mean
+			else:
+				loss = loss + d_mean
+		print('vgg loss shape: {}'.format(loss.get_shape()))
+		return loss
 
 class MinLossOverSamples(object):
 	def __init__(self, n_samples, pred_shape,

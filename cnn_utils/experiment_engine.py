@@ -253,6 +253,9 @@ def train_batch_by_batch(
 
 	start_time = time.time()
 
+	# do this once here to flush any setup information to the file
+	exp._reopen_log_file()
+
 	for e in range(start_epoch, end_epoch + 1):
 		file_stdout_logger.debug('{} training epoch {}/{}'.format(exp.model_name, e, end_epoch + 1))
 
