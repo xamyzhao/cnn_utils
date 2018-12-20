@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-from cnn_utils import image_utils
+from cnn_utils import classification_utils, image_utils, aug_utils
 
 
 # import mnist_data_utils
@@ -94,17 +94,126 @@ def pad_or_crop_to_shape(X, out_shape, border_color=1.):
 	return X
 
 
-def gen_generator_batch(batch_gen, include_noise_input=False, noise_size=100):
-	# assumes batch_gen returns X,Y
-	while (1):
-		X, _ = next(batch_gen)
+def gen_batch(ims_data, labels_data,
+              batch_size, target_size=None, randomize=False,
+              normalize_tanh=False,
+              labels_to_onehot_mapping=None,
+              aug_params=None, convert_onehot=False,
+              yield_aug_params=False, yield_idxs=False,
+              random_seed=None):
+	'''
 
-		if include_noise_input:
-			batch_size = X.shape[0]
-			x_noise = np.random.rand(batch_size, noise_size) * 2.0 - 1.0
-			yield [X, x_noise]
+	:param ims_data: list of images, or an image. If a single image, it will be automatically converted to a list
+	:param labels_data:
+	:param batch_size:
+	:param target_size:
+	:param randomize:
+	:param normalize_tanh:
+	:param labels_to_onehot_mapping:
+	:param aug_params:
+	:param convert_onehot:
+	:param yield_aug_params:
+	:param yield_idxs:
+	:param random_seed:
+	:return:
+	'''
+	if random_seed:
+		np.random.seed(random_seed)
+
+	if not isinstance(ims_data, list):
+		ims_data = [ims_data]
+
+	if not isinstance(normalize_tanh, list):
+		normalize_tanh = [normalize_tanh]
+	else:
+		assert len(normalize_tanh) == len(ims_data)
+
+	if aug_params is not None:
+		if not isinstance(aug_params, list):
+			aug_params = [aug_params]
 		else:
-			yield X
+			assert len(aug_params) == len(ims_data)
+
+	if target_size is not None:
+		if not isinstance(target_size, list):
+			target_size = [target_size]
+		else:
+			assert len(target_size) == len(ims_data)
+
+
+	# if we have labels that we want to generate from,
+	# put everything into a list for consistency
+	# (useful if we have labels and aux data)
+	if labels_data is not None:
+		if not isinstance(labels_data, list):
+			labels_data = [labels_data]
+
+		# each entry should correspond to an entry in labels_data
+		if not isinstance(convert_onehot, list):
+			convert_onehot = [convert_onehot]
+		else:
+			assert len(convert_onehot) == len(labels_data)
+
+
+	idxs = [-1]
+
+	n_ims = ims_data[0].shape[0]
+	h = ims_data[0].shape[1]
+	w = ims_data[0].shape[2]
+
+	if target_size is not None:
+		# pad each image and then re-concatenate
+		ims_data = [np.concatenate([
+			image_utils.pad_or_crop_to_shape(x, target_size)[np.newaxis]
+			for x in im_data], axis=0) for im_data in ims_data]
+
+	while True:
+		if randomize:
+			idxs = np.random.choice(n_ims, batch_size, replace=True)
+		else:
+			idxs = np.linspace(idxs[-1] + 1, idxs[-1] + 1 + batch_size - 1, batch_size, dtype=int)
+			restart_idxs = False
+			while np.any(idxs >= n_ims):
+				idxs[np.where(idxs >= n_ims)] = idxs[np.where(idxs >= n_ims)] - n_ims
+				restart_idxs = True
+
+		ims_batches = []
+		for im_data in ims_data:
+			X_batch = im_data[idxs]
+
+			if not X_batch.dtype == np.float32:
+				X_batch = (X_batch / 255.).astype(np.float32)
+			if normalize_tanh:
+				X_batch = image_utils.normalize(X_batch)
+
+			if aug_params is not None:
+				X_batch, aug_params = aug_utils.aug_mtg_batch(X_batch, **aug_params)
+			ims_batches.append(X_batch)
+
+		if labels_data is not None:
+			labels_batches = []
+			for Y in labels_data:
+				if convert_onehot:
+					Y_batch = classification_utils.labels_to_onehot(
+						Y[idxs],
+				        label_mapping=labels_to_onehot_mapping)
+				else:
+					Y_batch = Y[idxs]
+				labels_batches.append(Y_batch)
+		else:
+			labels_batches = None
+
+		if not randomize and restart_idxs:
+			idxs[-1] = -1
+
+		if yield_aug_params and yield_idxs:
+			yield tuple(ims_batches) +  tuple(labels_batches) + (aug_params, idxs)
+		elif yield_aug_params:
+			yield tuple(ims_batches) + tuple(labels_batches) + (aug_params, )
+		elif yield_idxs:
+			yield tuple(ims_batches) + tuple(labels_batches) + (idxs, )
+		else:
+			yield tuple(ims_batches) + tuple(labels_batches)
 
 
 # def gen_aug_batch( batch_gen, include_noise_input = False, noise_size = 100 ):
