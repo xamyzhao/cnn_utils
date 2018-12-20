@@ -124,7 +124,7 @@ class Experiment(object):
 
 		# we might wnat to print some models but not save them all in self.models
 		if models_to_print is None and hasattr(self, 'models_to_print'):
-			models_to_print = self.models_to_print
+			models_to_print = self.models_to_print + self.models
 		elif models_to_print is None:
 			models_to_print = self.models
 

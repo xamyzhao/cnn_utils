@@ -592,10 +592,12 @@ class VAE_metrics(object):
 		logvar_pred = y_pred
 		var_pred = K.exp(y_pred)
 
-		if self.var_target is None:
+		if self.var_target is None and self.logvar_target is not None:
 			var_target = K.exp(self.logvar_target)
-		else:
+		elif self.var_target is not None:
 			var_target = self.var_target
+		elif self.var_target is None and self.logvar_target is None:
+			var_target = y_true
 
 		kl_sigma_out = 0.5 * K.sum(
 			(var_pred / var_target) \
@@ -609,13 +611,20 @@ class VAE_metrics(object):
 		kl_mu terms of the KL divergence
 		y_pred should be mu_out
 		"""
-		if self.var_target is None:
+		if self.var_target is None and self.logvar_target is not None:
 			var_target = K.exp(self.logvar_target)
-		else:
+		elif self.var_target is not None:
 			var_target = self.var_target
+		elif self.var_target is None and self.logvar_target is None:
+			var_target = y_true
+
+		if self.mu_target is None:
+			mu_target = y_true
+		else:
+			mu_target = self.mu_target
 
 		kl_mu_out = 0.5 * K.sum(
-				K.square(y_pred - self.mu_target) / var_target, 
+				K.square(y_pred - mu_target) / var_target,
 			axis=self.axis)
 		return kl_mu_out
 
