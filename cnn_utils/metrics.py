@@ -278,7 +278,7 @@ class SummedLosses(object):
 	def compute_loss(self, y_true, y_pred):
 		total_loss = 0
 		for li in range(len(self.loss_fns)):
-			total_loss += self.loss_weights[li] * self.loss_fns[li](y_true, y_pred)
+			total_loss += self.loss_weights[li] * tf.reduce_mean(self.loss_fns[li](y_true, y_pred))
 		return total_loss
 
 

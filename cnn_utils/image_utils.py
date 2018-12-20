@@ -102,3 +102,5 @@ def create_gaussian_kernel(sigma, n_sigmas_per_side=8, n_dims=2):
 	#	cv2.imwrite('gauss_z.jpg', gauss_kernel_2d[:, :,gauss_kernel_2d.shape[2]/2 ]*255)
 	# gauss_kernel_2d = np.reshape(gauss_kernel_2d, gauss_kernel_2d.shape + (1,1))
 	return gauss_kernel_2d
+
+
