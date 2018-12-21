@@ -20,7 +20,7 @@ def label_ims(ims_batch, labels=None,
               inverse_normalize=False,
               normalize=False,
               clip_flow=10, display_h=128, pad_top=None, clip_norm=None,
-              color_space='rgb', concat_axis=0):
+              color_space='rgb', combine_from_axis=0, concat_axis=0):
 	'''
 	Displays a batch of matrices as an image.
 
@@ -40,7 +40,15 @@ def label_ims(ims_batch, labels=None,
 	if len(ims_batch.shape) == 3 and ims_batch.shape[-1] == 3:
 		# already an image
 		return ims_batch
-	
+
+	# transpose the image until batches are in the 0th axis
+	if not combine_from_axis == 0:
+		# compute all remaining axes
+		all_axes = range(len(ims_batch.shape))
+		all_axes[combine_from_axis] = []
+
+		ims_batch = np.transpose(ims_batch, (combine_from_axis,) + tuple(all_axes))
+
 	batch_size = ims_batch.shape[0]
 	h = ims_batch.shape[1]
 	w = ims_batch.shape[2]
@@ -89,12 +97,12 @@ def label_ims(ims_batch, labels=None,
 	elif normalize:
 		flattened_dims = np.prod(ims_batch.shape[1:])
 
-		X_spatially_flat = np.reshape(ims_batch, (ims_batch.shape[0], -1, n_chans))
+		X_spatially_flat = np.reshape(ims_batch, (batch_size, -1, n_chans))
 		X_orig_min = np.min(X_spatially_flat, axis=1)
 		X_orig_max = np.max(X_spatially_flat, axis=1)
 
 		# now actually flatten and normalize across channels
-		X_flat = np.reshape(ims_batch, (ims_batch.shape[0], -1))
+		X_flat = np.reshape(ims_batch, (batch_size, -1))
 		if clip_norm is None:
 			X_flat = X_flat - np.tile(np.min(X_flat, axis=1, keepdims=True), (1, flattened_dims))
 			# avoid dividing by 0

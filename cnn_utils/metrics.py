@@ -370,6 +370,7 @@ class TimeSummedLoss(object):
 			y_true = tf.pad(y_true, paddings=self.pad_amt, constant_values=1.)
 			y_pred = tf.pad(y_pred, paddings=self.pad_amt, constant_values=1.)
 
+		# TODO: switch to tf.map_fn?
 		true_frames = tf.unstack(y_true, num=self.n_frames, axis=self.time_axis)
 		pred_frames = tf.unstack(y_pred, num=self.n_frames, axis=self.time_axis)
 

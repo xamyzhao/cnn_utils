@@ -20,11 +20,14 @@ class Experiment(object):
 
 		return exp_name
 
-	def __init__(self, data_params, arch_params, exp_root='experiments', prompt_delete=False):
+	def __init__(self, data_params, arch_params,
+	             exp_root='experiments', prompt_delete=False, log_to_dir=True):
 		self.do_profile = False
+		self.log_to_dir = log_to_dir
 
 		self.arch_params = arch_params
 		self.data_params = data_params
+
 
 		# figure out model name0
 		self.get_model_name()
@@ -115,6 +118,10 @@ class Experiment(object):
 		print('create_generators not implemented')
 
 	def compile_models(self):
+		self.logger.debug(
+			'Compiling generator with losses {} and weights {}'.format(
+				self.loss_functions, self.loss_weights))
+
 		with open(os.path.join(self.exp_dir, 'arch_params.json'), 'w') as f:
 			json.dump(self.arch_params, f)
 
@@ -159,22 +166,27 @@ class Experiment(object):
 		if not hasattr(self, 'logger'):
 			self.logger = None
 
-		if self.logger is None:
+		if self.logger is None and self.log_to_dir:
 			formatter = logging.Formatter('[%(asctime)s] %(message)s', "%Y-%m-%d %H:%M:%S")
-			lfh = logging.FileHandler(filename=os.path.join(self.exp_dir, 'experiment.log'))
+			if self.log_to_dir:
+				lfh = logging.FileHandler(filename=os.path.join(self.exp_dir, 'experiment.log'))
+				lfh.setFormatter(formatter)
+				lfh.setLevel(logging.DEBUG)
 			lsh = logging.StreamHandler(sys.stdout)
-			lfh.setFormatter(formatter)
 			lsh.setFormatter(formatter)
-			lfh.setLevel(logging.DEBUG)
 			lsh.setLevel(logging.DEBUG)
 
 			self.logger = logging.getLogger(self.__class__.__name__)
 			self.logger.setLevel(logging.DEBUG)
 			self.logger.handlers = []
-			self.logger.addHandler(lfh)
+
+			if self.log_to_dir:
+				self.logger.addHandler(lfh)
+
 			self.logger.addHandler(lsh)
 
-		if self.do_profile:
+
+		if self.do_profile and self.log_to_dir:
 			formatter = logging.Formatter('[%(asctime)s] %(message)s', "%Y-%m-%d %H:%M:%S")
 			lfh = logging.FileHandler(filename=os.path.join(self.exp_dir, 'profiler.log'))
 			lfh.setFormatter(formatter)

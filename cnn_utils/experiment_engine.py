@@ -26,7 +26,11 @@ def configure_gpus(args):
 
 # loads a saved experiment using the saved parameters.
 # runs all initialization steps so that we can use the models right away
-def load_experiment_from_dir(from_dir, exp_class, debug=False, load_epoch=None):
+def load_experiment_from_dir(from_dir, exp_class,
+                             debug=False,
+                             load_epoch=None,
+                             log_to_dir=False,  # dont log if we are just loading this exp for evaluation
+                             ):
 	with open(os.path.join(from_dir, 'arch_params.json'), 'r') as f:
 		fromdir_arch_params = json.load(f)
 		fromdir_arch_params['exp_dir'] = from_dir
@@ -35,7 +39,7 @@ def load_experiment_from_dir(from_dir, exp_class, debug=False, load_epoch=None):
 
 	exp = exp_class(
 		data_params=fromdir_data_params, arch_params=fromdir_arch_params,
-	    prompt_delete=False)
+	    prompt_delete=False, log_to_dir=log_to_dir)
 
 	exp.load_data(debug=debug)
 	exp.create_models()
