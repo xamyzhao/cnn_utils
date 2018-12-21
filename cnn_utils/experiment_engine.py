@@ -60,7 +60,9 @@ def run_experiment(exp, run_args,
 	# create models and load existing ones if necessary
 	exp.create_models()
 
-	start_epoch = exp.load_models(run_args.epoch, init_layers=run_args.init_weights)
+	start_epoch = exp.load_models(run_args.epoch, 
+		stop_on_missing=not run_args.ignore_missing,
+		init_layers=run_args.init_weights)
 
 	# compile models for training
 	if run_args.do_profile:
