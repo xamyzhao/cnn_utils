@@ -12,6 +12,7 @@ from keras.utils import generic_utils
 from tensorflow.python.client import timeline
 
 from cnn_utils import my_callbacks
+import json
 
 
 def configure_gpus(args):
@@ -22,6 +23,25 @@ def configure_gpus(args):
 
 	K.tensorflow_backend.set_session(tf.Session(config=config))
 
+
+# loads a saved experiment using the saved parameters.
+# runs all initialization steps so that we can use the models right away
+def load_experiment_from_dir(from_dir, exp_class, debug=False, load_epoch=None):
+	with open(os.path.join(from_dir, 'arch_params.json'), 'r') as f:
+		fromdir_arch_params = json.load(f)
+		fromdir_arch_params['exp_dir'] = from_dir
+	with open(os.path.join(from_dir, 'data_params.json'), 'r') as f:
+		fromdir_data_params = json.load(f)
+
+	exp = exp_class(
+		data_params=fromdir_data_params, arch_params=fromdir_arch_params,
+	    prompt_delete=False)
+
+	exp.load_data(debug=debug)
+	exp.create_models()
+
+	loaded_epoch = exp.load_models(load_epoch)
+	return exp, loaded_epoch
 
 def run_experiment(exp, run_args,
                    end_epoch, save_every_n_epochs, test_every_n_epochs, early_stopping_eps=None):
