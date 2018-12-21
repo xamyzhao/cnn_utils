@@ -124,19 +124,19 @@ def gen_batch(ims_data, labels_data,
 		ims_data = [ims_data]
 
 	if not isinstance(normalize_tanh, list):
-		normalize_tanh = [normalize_tanh]
+		normalize_tanh = [normalize_tanh] * len(ims_data)
 	else:
 		assert len(normalize_tanh) == len(ims_data)
 
 	if aug_params is not None:
 		if not isinstance(aug_params, list):
-			aug_params = [aug_params]
+			aug_params = [aug_params] * len(ims_data)
 		else:
 			assert len(aug_params) == len(ims_data)
 
 	if target_size is not None:
 		if not isinstance(target_size, list):
-			target_size = [target_size]
+			target_size = [target_size] * len(ims_data)
 		else:
 			assert len(target_size) == len(ims_data)
 
@@ -150,7 +150,7 @@ def gen_batch(ims_data, labels_data,
 
 		# each entry should correspond to an entry in labels_data
 		if not isinstance(convert_onehot, list):
-			convert_onehot = [convert_onehot]
+			convert_onehot = [convert_onehot] * len(labels_data)
 		else:
 			assert len(convert_onehot) == len(labels_data)
 
@@ -178,7 +178,7 @@ def gen_batch(ims_data, labels_data,
 				restart_idxs = True
 
 		ims_batches = []
-		for im_data in ims_data:
+		for i, im_data in enumerate(ims_data):
 			X_batch = im_data[idxs]
 
 			if not X_batch.dtype == np.float32:
@@ -186,14 +186,14 @@ def gen_batch(ims_data, labels_data,
 			if normalize_tanh:
 				X_batch = image_utils.normalize(X_batch)
 
-			if aug_params is not None:
-				X_batch, aug_params = aug_utils.aug_mtg_batch(X_batch, **aug_params)
+			if aug_params is not None and aug_params[i] is not None:
+				X_batch, aug_params[i] = aug_utils.aug_mtg_batch(X_batch, **aug_params[i])
 			ims_batches.append(X_batch)
 
 		if labels_data is not None:
 			labels_batches = []
-			for Y in labels_data:
-				if convert_onehot:
+			for li, Y in enumerate(labels_data):
+				if convert_onehot[li]:
 					Y_batch = classification_utils.labels_to_onehot(
 						Y[idxs],
 				        label_mapping=labels_to_onehot_mapping)

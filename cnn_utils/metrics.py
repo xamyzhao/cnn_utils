@@ -607,6 +607,7 @@ class VAE_metrics(object):
 			- 1, axis=self.axis)
 		return kl_sigma_out
 
+
 	def kl_mu(self, y_true, y_pred):
 		"""
 		kl_mu terms of the KL divergence
@@ -619,6 +620,7 @@ class VAE_metrics(object):
 		elif self.var_target is None and self.logvar_target is None:
 			var_target = y_true
 
+		# TODO: we cant have both self.mu_target is None and slef.var_target is None
 		if self.mu_target is None:
 			mu_target = y_true
 		else:
