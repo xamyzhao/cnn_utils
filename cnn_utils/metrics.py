@@ -446,12 +446,18 @@ class TimeSliceLoss(object):
 class TimeSummedLoss(object):
 	def __init__(self, n_frames, loss_fn, 
 			time_axis=-2, compute_mean=True, pad_amt=None,
+	        include_frames=None,
 		):
 		self.time_axis = time_axis
 		self.n_frames = n_frames
 		self.loss_fn = loss_fn
 		self.compute_mean = compute_mean	
 		self.pad_amt = pad_amt
+
+		if include_frames is not None:
+			self.include_frames = include_frames
+		else:
+			self.include_frames = list(range(self.n_frames))
 
 	def compute_loss(self, y_true, y_pred):
 		if self.pad_amt is not None:
@@ -463,7 +469,7 @@ class TimeSummedLoss(object):
 		pred_frames = tf.unstack(y_pred, num=self.n_frames, axis=self.time_axis)
 
 		total_loss = 0
-		for t in range(self.n_frames):
+		for t in self.include_frames:
 			loss = self.loss_fn(y_true=true_frames[t], y_pred=pred_frames[t])
 			total_loss += loss
 		if self.compute_mean:
