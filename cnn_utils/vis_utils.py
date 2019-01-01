@@ -44,9 +44,8 @@ def label_ims(ims_batch, labels=None,
 	# transpose the image until batches are in the 0th axis
 	if not combine_from_axis == 0:
 		# compute all remaining axes
-		all_axes = range(len(ims_batch.shape))
-		all_axes[combine_from_axis] = []
-
+		all_axes = list(range(len(ims_batch.shape)))
+		del all_axes[combine_from_axis]
 		ims_batch = np.transpose(ims_batch, (combine_from_axis,) + tuple(all_axes))
 
 	batch_size = ims_batch.shape[0]
@@ -63,17 +62,20 @@ def label_ims(ims_batch, labels=None,
 		labels = [labels] * batch_size
 
 	scale_factor = display_h / float(h)
+
 	if pad_top:
 		im_h = int(display_h + pad_top)
-
 	else:
 		im_h = display_h
+		im_w = round(scale_factor * float(w))
 
+	# make sure we have a channels dimension
 	if len(ims_batch.shape) < 4:
 		ims_batch = np.expand_dims(ims_batch, 3)
 
 	if ims_batch.shape[-1] == 2:  # assume to be x,y flow; map to color im
-		X_fullcolor = np.concatenate([ims_batch.copy(), np.zeros(ims_batch.shape[:-1] + (1,))], axis=3)
+		X_fullcolor = np.concatenate([
+			ims_batch.copy(), np.zeros(ims_batch.shape[:-1] + (1,))], axis=3)
 
 		if labels is not None:
 			labels = [''] * batch_size
@@ -165,6 +167,7 @@ def label_ims(ims_batch, labels=None,
 	if labels is not None and len(labels) > 0:
 		im_pil = Image.fromarray(out_im)
 		draw = ImageDraw.Draw(im_pil)
+
 		for i in range(batch_size):
 			if len(labels) > i:  # if we have a label for this image
 				if type(labels[i]) == tuple or type(labels[i]) == list:
@@ -178,8 +181,10 @@ def label_ims(ims_batch, labels=None,
 					formatted_text = str(round(labels[i], 2))  # round floats to 2 digits
 				elif isinstance(labels[i], np.ndarray):
 					# assume that this is a 1D array
-					labels[i] = np.squeeze(labels[i])
-					formatted_text = ', '.join([str(round(labels[i][j], 2)) for j in range(labels[i].size)])
+					curr_labels = np.squeeze(labels[i]).astype(np.float32)
+					formatted_text = np.array2string(curr_labels, precision=2, separator=',')
+					#', '.join(['{}'.format(
+					#	np.around(labels[i][j], 2)) for j in range(labels[i].size)])
 				else:
 					formatted_text = '{}'.format(labels[i])
 
@@ -191,8 +196,8 @@ def label_ims(ims_batch, labels=None,
 					for li, line in enumerate(formatted_text):
 						if concat_axis == 0:
 							draw.text((5, i * im_h + 5 + 14 * li), line, font=font, fill=(50, 50, 255))
-						else:
-							draw.text((5 + i * im_h, 5 + 14 * li), line, font=font, fill=(50, 50, 255))
+						elif concat_axis == 1:
+							draw.text((5 + i * im_w, 5 + 14 * li), line, font=font, fill=(50, 50, 255))
 
 		out_im = np.asarray(im_pil)
 	

@@ -15,9 +15,9 @@ from cnn_utils import my_callbacks
 import json
 
 
-def configure_gpus(args):
+def configure_gpus(gpus):
 	# set gpu id and tf settings
-	os.environ['CUDA_VISIBLE_DEVICES'] = ','.join([str(g) for g in args.gpu])
+	os.environ['CUDA_VISIBLE_DEVICES'] = ','.join([str(g) for g in gpus])
 	config = tf.ConfigProto(allow_soft_placement=True)
 	config.gpu_options.allow_growth = True
 
@@ -27,7 +27,7 @@ def configure_gpus(args):
 # loads a saved experiment using the saved parameters.
 # runs all initialization steps so that we can use the models right away
 def load_experiment_from_dir(from_dir, exp_class,
-                             debug=False,
+                             load_n=None,
                              load_epoch=None,
                              log_to_dir=False,  # dont log if we are just loading this exp for evaluation
                              ):
@@ -41,7 +41,7 @@ def load_experiment_from_dir(from_dir, exp_class,
 		data_params=fromdir_data_params, arch_params=fromdir_arch_params,
 	    prompt_delete=False, log_to_dir=log_to_dir)
 
-	exp.load_data(debug=debug)
+	exp.load_data(load_n=load_n)
 	exp.create_models()
 
 	loaded_epoch = exp.load_models(load_epoch)
@@ -54,6 +54,8 @@ def run_experiment(exp, run_args,
 			end_epoch = int(run_args.epoch) + 10
 		else:
 			end_epoch = 10
+		if run_args.loadn is None:
+			run_args.loadn = 1
 
 	if run_args.batch_size is None:
 		run_args.batch_size = 8
@@ -79,7 +81,7 @@ def run_experiment(exp, run_args,
 	file_logger.addHandler(lfh)
 
 	# load the dataset. load fewer if debugging
-	exp.load_data(run_args.debug or run_args.eval)
+	exp.load_data(run_args.loadn)
 
 	# create models and load existing ones if necessary
 	exp.create_models()

@@ -57,6 +57,12 @@ class Experiment(object):
 		with open(os.path.join(self.exp_dir, 'data_params.json'), 'w') as f:
 			json.dump(self.data_params, f)
 
+	def _save_params(self):
+		with open(os.path.join(self.exp_dir, 'arch_params.json'), 'w') as f:
+			json.dump(self.arch_params, f)
+		with open(os.path.join(self.exp_dir, 'data_params.json'), 'w') as f:
+			json.dump(self.data_params, f)
+
 	def create_models(self):
 		self._print_models()
 		return None
@@ -166,7 +172,7 @@ class Experiment(object):
 		if not hasattr(self, 'logger'):
 			self.logger = None
 
-		if self.logger is None and self.log_to_dir:
+		if self.logger is None:
 			formatter = logging.Formatter('[%(asctime)s] %(message)s', "%Y-%m-%d %H:%M:%S")
 			if self.log_to_dir:
 				lfh = logging.FileHandler(filename=os.path.join(self.exp_dir, 'experiment.log'))

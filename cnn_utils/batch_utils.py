@@ -193,12 +193,15 @@ def gen_batch(ims_data, labels_data,
 		if labels_data is not None:
 			labels_batches = []
 			for li, Y in enumerate(labels_data):
-				if convert_onehot[li]:
-					Y_batch = classification_utils.labels_to_onehot(
-						Y[idxs],
-				        label_mapping=labels_to_onehot_mapping)
+				if Y is None:
+					Y_batch = None
 				else:
-					Y_batch = Y[idxs]
+					if convert_onehot[li]:
+						Y_batch = classification_utils.labels_to_onehot(
+							Y[idxs],
+							label_mapping=labels_to_onehot_mapping)
+					else:
+						Y_batch = Y[idxs]
 				labels_batches.append(Y_batch)
 		else:
 			labels_batches = None
