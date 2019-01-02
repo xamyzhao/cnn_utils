@@ -1281,6 +1281,16 @@ def bounded_neg_mean_loss(y_true, y_pred):
 	return K.sigmoid(-K.mean(y_pred))
 
 
+class CriticScore(object):
+	# WGAN loss
+	def __init__(self, critic_model):
+		self.critic_model = critic_model
+
+	def compute_loss(self, y_true, y_pred):
+		critic_score = self.critic_model(y_pred)
+
+		return neg_mean_loss(y_pred, y_pred)
+
 def neg_mean_loss(y_true, y_pred):
 	return -K.mean(y_pred)
 
