@@ -50,6 +50,9 @@ class Experiment(object):
 		self.validation_losses_buffer = []
 		self._init_logger()
 
+	def set_debug_mode(self, do_debug=True):
+		self.debug = do_debug
+
 	def get_dirs(self):
 		return self.exp_dir, self.figures_dir, self.logs_dir, self.models_dir
 
@@ -82,7 +85,7 @@ class Experiment(object):
 				model_filename = [os.path.join(self.models_dir, mf) for mf in model_files \
 				                  if mf.split('_epoch')[0] == m.name and 'epoch{}'.format(load_epoch) in mf]
 				if len(model_filename) == 0:
-					self.logger.debug('Could not find any model files with {}!'.format(m.name))
+					self.logger.debug(F'Could not find any model files with name {m.name} and epoch {load_epoch}!')
 					model_filename = None
 					if stop_on_missing:
 						sys.exit()
@@ -155,7 +158,7 @@ class Experiment(object):
 
 	def save_models(self, epoch, iter_count=None):
 		for m in self.models:
-			print('Saving {}'.format(m.name))
+			self.logger.debug(F'Saving model {m.name} epoch {epoch}')
 			if iter_count is not None:
 				m.save(os.path.join(self.models_dir, '{}_epoch{}_iter{}.h5'.format(m.name, epoch, iter_count)))
 			else:

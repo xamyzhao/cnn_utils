@@ -56,6 +56,10 @@ def run_experiment(exp, run_args,
 			end_epoch = 10
 		if run_args.loadn is None:
 			run_args.loadn = 1
+		save_every_n_epochs = 2
+		test_every_n_epochs = 2
+
+		exp.set_debug_mode(True)
 
 	if run_args.batch_size is None:
 		run_args.batch_size = 8
@@ -124,7 +128,8 @@ def run_experiment(exp, run_args,
 			test_every_n_epochs=test_every_n_epochs,
 			tbw=tbw, file_stdout_logger=file_stdout_logger, file_logger=file_logger,
 			run_args=run_args,
-			early_stopping_eps=early_stopping_eps
+			early_stopping_eps=early_stopping_eps,
+			run_metadata=run_metadata,
 		)
 
 	return exp_dir
@@ -254,7 +259,8 @@ def train_batch_by_batch(
 		start_epoch, end_epoch, save_every_n_epochs, test_every_n_epochs,
 		tbw, file_stdout_logger, file_logger,
 		run_args,
-		early_stopping_eps
+		early_stopping_eps,
+		run_metadata=None
 ):
 	max_n_batch_per_epoch = 1000  # limits each epoch to batch_size * 1000 examples. i think this is ok.
 	n_batch_per_epoch_train = min(max_n_batch_per_epoch, int(np.ceil(exp.get_n_train() / float(batch_size))))
