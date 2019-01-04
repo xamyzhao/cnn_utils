@@ -137,7 +137,6 @@ class VggFeatLoss(object):
 				loss = d_mean
 			else:
 				loss = loss + d_mean
-		print('vgg loss shape: {}'.format(loss.get_shape()))
 		return loss
 
 class MinLossOverSamples(object):

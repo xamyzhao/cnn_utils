@@ -40,13 +40,16 @@ def load_experiment_from_dir(from_dir, exp_class,
 
 	exp = exp_class(
 		data_params=fromdir_data_params, arch_params=fromdir_arch_params,
-	    prompt_delete=False, log_to_dir=log_to_dir)
+	    prompt_delete=False, prompt_rename=False, log_to_dir=log_to_dir)
 
 	exp.load_data(load_n=load_n)
 	exp.create_models()
 
 	if do_load_models:
 		loaded_epoch = exp.load_models(load_epoch)
+	else:
+		loaded_epoch = None
+
 	return exp, loaded_epoch
 
 def run_experiment(exp, run_args,

@@ -21,7 +21,7 @@ class Experiment(object):
 		return exp_name
 
 	def __init__(self, data_params, arch_params,
-	             exp_root='experiments', prompt_delete=False, log_to_dir=True):
+	             exp_root='experiments', prompt_delete=False, prompt_rename=False, log_to_dir=True):
 		self.do_profile = False
 		self.log_to_dir = log_to_dir
 
@@ -43,7 +43,7 @@ class Experiment(object):
 		self.figures_dir, self.logs_dir, self.models_dir \
 			= file_utils.make_output_dirs(
 			self.model_name,
-			exp_root='./{}/'.format(exp_root), prompt_delete=prompt_delete, existing_exp_dir=exp_dir)
+			exp_root='./{}/'.format(exp_root), prompt_delete=prompt_delete, prompt_rename=prompt_rename, existing_exp_dir=exp_dir)
 
 		self.arch_params['exp_dir'] = self.exp_dir
 

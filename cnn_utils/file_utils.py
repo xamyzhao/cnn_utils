@@ -73,24 +73,29 @@ def make_output_dirs(experiment_name, prompt_delete=True, prompt_rename=True,
 					 ):
 
 	do_rename = False
-
 	if existing_exp_dir is None and target_exp_dir is None:
 		# brand new experiment
 		target_exp_dir = exp_root + experiment_name
 		model_name = experiment_name
-	elif os.path.basename(existing_exp_dir).startswith(experiment_name) and target_exp_dir is None:
+	elif existing_exp_dir is not None and os.path.basename(existing_exp_dir).startswith(experiment_name) and target_exp_dir is None:
 		# we are probably trying to open something like exp_name_1, so set the exp_name accordingly
 		model_name = os.path.basename(existing_exp_dir)
+		target_exp_dir = os.path.join(exp_root, model_name)
 	elif target_exp_dir is None:
 		# make sure the exp naming scheme hasnt changed
 		# if it has changed, prompt to rename the old experiment to the new one
 		target_exp_dir = os.path.join(exp_root, experiment_name)
-		if prompt_rename:
+		if prompt_rename:  # TODO: this param really means: do we want to try to update the name. maybe do_update_name?
 			target_exp_dir = _prompt_rename(existing_exp_dir, target_exp_dir)
+			do_rename = True
+			# we might have changed the model name to something that exists, so prompt if so
+			prompt_delete = True
+		else:
+			target_exp_dir = existing_exp_dir # just assume we want to continue in the old one
 		model_name = os.path.basename(target_exp_dir)
-		do_rename = True
-		# we might have changed the model name to something that exists, so prompt if so
-		prompt_delete = True
+	else:
+		# TODO: these are basically the same thing except when we have a _1
+		model_name = experiment_name
 
 
 	figures_dir = os.path.join(target_exp_dir, 'figures')
@@ -177,7 +182,7 @@ def make_output_dirs(experiment_name, prompt_delete=True, prompt_rename=True,
 		if not os.path.isdir(models_dir):
 			os.mkdir(models_dir)
 
-	return model_name, existing_exp_dir, figures_dir, logs_dir, models_dir
+	return model_name, target_exp_dir, figures_dir, logs_dir, models_dir
 
 def _test_make_output_dirs():
 	model_name = '_test_make_output_dirs'
