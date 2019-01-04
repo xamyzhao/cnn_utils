@@ -30,6 +30,7 @@ def load_experiment_from_dir(from_dir, exp_class,
                              load_n=None,
                              load_epoch=None,
                              log_to_dir=False,  # dont log if we are just loading this exp for evaluation
+							 do_load_models=True
                              ):
 	with open(os.path.join(from_dir, 'arch_params.json'), 'r') as f:
 		fromdir_arch_params = json.load(f)
@@ -44,7 +45,8 @@ def load_experiment_from_dir(from_dir, exp_class,
 	exp.load_data(load_n=load_n)
 	exp.create_models()
 
-	loaded_epoch = exp.load_models(load_epoch)
+	if do_load_models:
+		loaded_epoch = exp.load_models(load_epoch)
 	return exp, loaded_epoch
 
 def run_experiment(exp, run_args,
