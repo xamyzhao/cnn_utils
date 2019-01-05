@@ -1280,6 +1280,23 @@ def bounded_neg_mean_loss(y_true, y_pred):
 	return K.sigmoid(-K.mean(y_pred))
 
 
+class DiscriminatorScore(object):
+	# regular GAN loss
+	def __init__(self, disc_model, loss_fn):
+		self.disc_model = disc_model
+		self.loss_fn = loss_fn
+
+	def compute_loss(self, y_true, y_pred):
+		self.disc_model.trainable = False
+		for l in self.disc_model.layers:
+			l.trainable = False
+
+		disc_score = self.disc_model(y_pred)
+
+		# TODO: might break because y_true is not the same size as y_pred
+		return self.loss_fn(y_true, disc_score)
+
+
 class CriticScore(object):
 	# WGAN loss
 	def __init__(self, critic_model):
