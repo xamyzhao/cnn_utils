@@ -1284,11 +1284,16 @@ class CriticScore(object):
 	# WGAN loss
 	def __init__(self, critic_model):
 		self.critic_model = critic_model
+		
 
 	def compute_loss(self, y_true, y_pred):
+		self.critic_model.trainable = False
+		for l in self.critic_model.layers:
+			l.trainable = False
+
 		critic_score = self.critic_model(y_pred)
 
-		return neg_mean_loss(y_pred, y_pred)
+		return 0. - tf.reduce_mean(critic_score)
 
 def neg_mean_loss(y_true, y_pred):
 	return -K.mean(y_pred)

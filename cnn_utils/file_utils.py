@@ -161,7 +161,7 @@ def make_output_dirs(experiment_name, prompt_delete=True, prompt_rename=True,
 			elif choice in make_new_choices:
 				copy_count += 1
 				model_name = experiment_name + '_{}'.format(copy_count)
-				existing_exp_dir = exp_root + model_name
+				target_exp_dir = exp_root + model_name
 
 				figures_dir = exp_root + model_name + '/figures'
 				logs_dir = exp_root + model_name + '/logs'

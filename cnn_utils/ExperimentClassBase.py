@@ -21,8 +21,10 @@ class Experiment(object):
 		return exp_name
 
 	def __init__(self, data_params, arch_params,
-	             exp_root='experiments', prompt_delete=False, prompt_rename=False, log_to_dir=True):
-		self.do_profile = False
+	             exp_root='experiments', prompt_delete=False, prompt_rename=False, 
+				do_profile=False,
+				log_to_dir=True):
+		self.do_profile = do_profile
 		self.log_to_dir = log_to_dir
 
 		self.arch_params = arch_params
