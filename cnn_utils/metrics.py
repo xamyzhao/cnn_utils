@@ -1300,8 +1300,10 @@ class DiscriminatorScore(object):
 
 class CriticScore(object):
 	# WGAN loss
-	def __init__(self, critic_model):
+	def __init__(self, critic_model, loss_fn=None, target_score=None):
 		self.critic_model = critic_model
+		self.loss_fn = loss_fn
+		self.target_score = target_score
 		
 
 	def compute_loss(self, y_true, y_pred):
@@ -1311,7 +1313,10 @@ class CriticScore(object):
 
 		critic_score = self.critic_model(y_pred)
 
-		return 0. - tf.reduce_mean(critic_score)
+		if self.loss_fn is None:
+			return 0. - tf.reduce_mean(critic_score)
+		else:
+			return self.loss_fn(self.target_score, critic_score)
 
 def neg_mean_loss(y_true, y_pred):
 	return -K.mean(y_pred)
