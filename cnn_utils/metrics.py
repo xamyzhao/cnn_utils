@@ -1282,9 +1282,10 @@ def bounded_neg_mean_loss(y_true, y_pred):
 
 class DiscriminatorScore(object):
 	# regular GAN loss
-	def __init__(self, disc_model, loss_fn):
+	def __init__(self, disc_model, loss_fn, target_score):
 		self.disc_model = disc_model
 		self.loss_fn = loss_fn
+		self.target_score = target_score
 
 	def compute_loss(self, y_true, y_pred):
 		self.disc_model.trainable = False
@@ -1292,9 +1293,9 @@ class DiscriminatorScore(object):
 			l.trainable = False
 
 		disc_score = self.disc_model(y_pred)
-
+		#disc_target = tf.ones(disc_score.get_shape().as_list()) * self.target_score
 		# TODO: might break because y_true is not the same size as y_pred
-		return self.loss_fn(y_true, disc_score)
+		return self.loss_fn(self.target_score, disc_score)
 
 
 class CriticScore(object):
