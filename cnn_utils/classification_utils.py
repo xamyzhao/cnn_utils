@@ -13,6 +13,15 @@ def is_labels( oh ):
 def labels_to_onehot( labels, n_classes=0, label_mapping = None ):
 	if labels is None:
 		return labels
+	# we can use either n_classes (which assumes labels from 0 to n_classes-1) or a label_mapping
+	if label_mapping is None and n_classes == 0:
+		label_mapping = list(np.unique(labels))
+		n_classes = len(np.unique(labels)) #np.max(labels)
+	elif n_classes > 0 and label_mapping is None:
+		# infer label mapping from # of classes
+		label_mapping = np.linspace(0, n_classes, n_classes, endpoint=False).astype(int).tolist()
+	elif n_classes == 0 and label_mapping is not None:
+		n_classes = len(label_mapping)
 
 	if labels.shape[-1] == len(label_mapping) and np.max(labels) <= 1. and np.min(labels) >= 0.:
 		# already onehot
@@ -22,14 +31,6 @@ def labels_to_onehot( labels, n_classes=0, label_mapping = None ):
 		labels = np.take(labels, 0, axis=-1)
 
 	labels = np.asarray(labels)
-	if label_mapping is None and n_classes == 0:
-		label_mapping = list(np.unique(labels))
-		n_classes = len(np.unique(labels)) #np.max(labels)
-	elif n_classes > 0 and label_mapping is None:
-		# infer label mapping from # of classes
-		label_mapping = np.linspace(0, n_classes, n_classes, endpoint=False).astype(int).tolist()
-	elif n_classes == 0 and label_mapping is not None:
-		n_classes = len(label_mapping)
 
 	if len(label_mapping) == 2 and 0 in label_mapping and 1 in label_mapping and type(labels) == np.ndarray and np.array_equal( np.max(labels, axis=-1), np.ones( (labels.shape[0],))):
 		return labels

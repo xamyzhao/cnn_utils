@@ -133,6 +133,7 @@ def gen_batch(ims_data, labels_data,
 			aug_params = [aug_params] * len(ims_data)
 		else:
 			assert len(aug_params) == len(ims_data)
+		out_aug_params = aug_params[:]
 
 	if target_size is not None:
 		if not isinstance(target_size, list):
@@ -181,13 +182,14 @@ def gen_batch(ims_data, labels_data,
 		for i, im_data in enumerate(ims_data):
 			X_batch = im_data[idxs]
 
-			if not X_batch.dtype == np.float32:
+			if not X_batch.dtype == np.float32 and not X_batch.dtype == np.float64:
 				X_batch = (X_batch / 255.).astype(np.float32)
-			if normalize_tanh:
+
+			if normalize_tanh[i]:
 				X_batch = image_utils.normalize(X_batch)
 
 			if aug_params is not None and aug_params[i] is not None:
-				X_batch, aug_params[i] = aug_utils.aug_mtg_batch(X_batch, **aug_params[i])
+				X_batch, out_aug_params[i] = aug_utils.aug_im_batch(X_batch, **aug_params[i])
 			ims_batches.append(X_batch)
 
 		if labels_data is not None:
@@ -210,9 +212,9 @@ def gen_batch(ims_data, labels_data,
 			idxs[-1] = -1
 
 		if yield_aug_params and yield_idxs:
-			yield tuple(ims_batches) +  tuple(labels_batches) + (aug_params, idxs)
+			yield tuple(ims_batches) +  tuple(labels_batches) + (out_aug_params, idxs)
 		elif yield_aug_params:
-			yield tuple(ims_batches) + tuple(labels_batches) + (aug_params, )
+			yield tuple(ims_batches) + tuple(labels_batches) + (out_aug_params, )
 		elif yield_idxs:
 			yield tuple(ims_batches) + tuple(labels_batches) + (idxs, )
 		else:

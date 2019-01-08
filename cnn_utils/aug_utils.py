@@ -206,7 +206,7 @@ def aug_rand_flow(X, flow_sigma, blur_sigma):
 	return X_aug, flow_batch
 
 
-def aug_mtg_batch( 
+def aug_im_batch( 
 		X, 
 		crop_to_size_range=None,
 		pad_to_size=None,
@@ -218,9 +218,11 @@ def aug_mtg_batch(
 		border_val=(1., 1., 1.), rot_range = None):
 
 	batch_size = X.shape[0]
+
 	aug_params = {
 		'scales': None,
 		'rotations': None }
+
 	aug_params = dict()							
 	if not isinstance(scale_range, tuple) and not isinstance(scale_range,list):
 		scale_range = (1 - scale_range, 1 + scale_range)

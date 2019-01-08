@@ -443,7 +443,7 @@ class TimeSliceLoss(object):
 
 
 class TimeSummedLoss(object):
-	def __init__(self, n_frames, loss_fn, 
+	def __init__(self, loss_fn, n_frames=None,
 			time_axis=-2, compute_mean=True, pad_amt=None,
 	        include_frames=None,
 		):
@@ -452,27 +452,29 @@ class TimeSummedLoss(object):
 		self.loss_fn = loss_fn
 		self.compute_mean = compute_mean	
 		self.pad_amt = pad_amt
-
-		if include_frames is not None:
-			self.include_frames = include_frames
-		else:
-			self.include_frames = list(range(self.n_frames))
+		self.include_frames = include_frames
 
 	def compute_loss(self, y_true, y_pred):
 		if self.pad_amt is not None:
 			y_true = tf.pad(y_true, paddings=self.pad_amt, constant_values=1.)
 			y_pred = tf.pad(y_pred, paddings=self.pad_amt, constant_values=1.)
 
+		n_frames = y_pred.get_shape().as_list()[-1]
+		if self.include_frames is None:
+			include_frames = list(range(n_frames))
+		else:
+			include_frames = self.include_frames
+
 		# TODO: switch to tf.map_fn?
-		true_frames = tf.unstack(y_true, num=self.n_frames, axis=self.time_axis)
-		pred_frames = tf.unstack(y_pred, num=self.n_frames, axis=self.time_axis)
+		true_frames = tf.unstack(y_true, num=n_frames, axis=self.time_axis)
+		pred_frames = tf.unstack(y_pred, num=n_frames, axis=self.time_axis)
 
 		total_loss = 0
-		for t in self.include_frames:
+		for t in include_frames:
 			loss = self.loss_fn(y_true=true_frames[t], y_pred=pred_frames[t])
 			total_loss += loss
 		if self.compute_mean:
-			total_loss /= float(self.n_frames)
+			total_loss /= float(n_frames)
 		return total_loss
 
 

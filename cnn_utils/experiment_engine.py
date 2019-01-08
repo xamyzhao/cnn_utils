@@ -90,7 +90,7 @@ def run_experiment(exp, run_args,
 	file_logger.addHandler(lfh)
 
 	# load the dataset. load fewer if debugging
-	exp.load_data(run_args.loadn)
+	exp.load_data(load_n=run_args.loadn)
 
 	# create models and load existing ones if necessary
 	exp.create_models()
