@@ -116,7 +116,7 @@ def aug_params_to_transform_matrices(
 	if integer_values:
 		T = np.round(T).astype(int)
 
-	return T
+	return T, (thetas, scales, trans_x, trans_y, shear_x, shear_y, do_flip_horiz, do_flip_vert)
 
 
 def _apply_transformation_matrix_batch(X_batch, T_batch):
