@@ -26,16 +26,15 @@ def augScale(I, points=None, scale_rand=None, obj_scale=1.0, target_scale=1.0, p
 		                           int(math.ceil(border_size[0] / 2.0)), 0, 0, \
 		                           cv2.BORDER_CONSTANT, value=border_color)
 	elif border_size[0] < 0:
-		I_new = I_new[-int(math.floor(border_size[0] / 2.0)): I_new.shape[0] + int(math.ceil(border_size[0] / 2.0)), :,
-		        :]
+		I_new = I_new[
+			-int(math.floor(border_size[0] / 2.0)):I_new.shape[0] + int(math.ceil(border_size[0] / 2.0))]
 
 	if border_size[1] > 0:
 		I_new = cv2.copyMakeBorder(I_new, 0, 0, int(math.floor(border_size[1] / 2.0)), \
 		                           int(math.ceil(border_size[1] / 2.0)), \
 		                           cv2.BORDER_CONSTANT, value=border_color)
 	elif border_size[1] < 0:
-		I_new = I_new[:, -int(math.floor(border_size[1] / 2.0)): I_new.shape[1] + int(math.ceil(border_size[1] / 2.0)),
-		        :]
+		I_new = I_new[:, -int(math.floor(border_size[1] / 2.0)): I_new.shape[1] + int(math.ceil(border_size[1] / 2.0))]
 
 	if points is not None:
 		points = points * scale

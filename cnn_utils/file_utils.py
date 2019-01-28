@@ -61,9 +61,9 @@ def _prompt_rename(old_dir, new_dir):
 
 	if choice in rename_choices:
 #		os.rename(old_dir, new_dir)
-		return new_dir
+		return new_dir, True
 	else:
-		return old_dir
+		return old_dir, False
 
 
 def make_output_dirs(experiment_name, prompt_delete=True, prompt_rename=True,
@@ -73,6 +73,8 @@ def make_output_dirs(experiment_name, prompt_delete=True, prompt_rename=True,
 					 ):
 
 	do_rename = False
+	print('Existing exp dir: {}'.format(existing_exp_dir))
+	print('Target exp dir: {}'.format(target_exp_dir))
 	if existing_exp_dir is None and target_exp_dir is None:
 		# brand new experiment
 		target_exp_dir = exp_root + experiment_name
@@ -86,10 +88,11 @@ def make_output_dirs(experiment_name, prompt_delete=True, prompt_rename=True,
 		# if it has changed, prompt to rename the old experiment to the new one
 		target_exp_dir = os.path.join(exp_root, experiment_name)
 		if prompt_rename:  # TODO: this param really means: do we want to try to update the name. maybe do_update_name?
-			target_exp_dir = _prompt_rename(existing_exp_dir, target_exp_dir)
-			do_rename = True
-			# we might have changed the model name to something that exists, so prompt if so
-			prompt_delete = True
+			target_exp_dir, do_rename = _prompt_rename(existing_exp_dir, target_exp_dir)
+			
+			if do_rename:# we might have changed the model name to something that exists, so prompt if so
+				print('Renaming {} to {}!'.format(existing_exp_dir, target_exp_dir))
+				prompt_delete = True
 		else:
 			target_exp_dir = existing_exp_dir # just assume we want to continue in the old one
 		model_name = os.path.basename(target_exp_dir)

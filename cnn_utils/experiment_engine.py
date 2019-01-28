@@ -40,7 +40,8 @@ def load_experiment_from_dir(from_dir, exp_class,
 
 	exp = exp_class(
 		data_params=fromdir_data_params, arch_params=fromdir_arch_params,
-	    prompt_delete=False, prompt_rename=False, log_to_dir=log_to_dir)
+	    prompt_delete=False, prompt_rename=True, # in case the experiment was renamed
+		log_to_dir=log_to_dir)
 
 	exp.load_data(load_n=load_n)
 	exp.create_models()
@@ -59,8 +60,14 @@ def run_experiment(exp, run_args,
 			end_epoch = int(run_args.epoch) + 10
 		else:
 			end_epoch = 10
-		if run_args.loadn is None:
+
+		# TODO: find a better way to set default params in case our experiment doesnt use them?
+		if hasattr(run_args, 'loadn') and run_args.loadn is None:
 			run_args.loadn = 1
+		elif not hasattr(run_args, 'loadn'):
+			run_args.loadn = None
+
+
 		save_every_n_epochs = 2
 		test_every_n_epochs = 2
 
@@ -68,6 +75,9 @@ def run_experiment(exp, run_args,
 
 	if run_args.batch_size is None:
 		run_args.batch_size = 8
+
+	if not hasattr(run_args, 'ignore_missing'):
+		run_args.ignore_missing = False
 
 	exp_dir, figures_dir, logs_dir, models_dir = exp.get_dirs()
 

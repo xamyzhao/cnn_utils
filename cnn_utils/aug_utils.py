@@ -264,14 +264,20 @@ def aug_im_batch(
 	else:
 		max_n_chans = 1
 
+	# we can only augment 3 channels at a time, so split the stack into groups of 3
+	n_ims = int(np.ceil(X.shape[-1] / float(max_n_chans)))
 	for bi in range(X.shape[0]):
-		for cgi in range(int(round(X.shape[-1] / max_n_chans))):
-			curr_X = X_aug[bi, :, :, cgi*max_n_chans : (cgi + 1)*max_n_chans]
+		
+		for cgi in range(n_ims):
+			curr_X = np.reshape(
+				X_aug[bi, :, :, cgi * max_n_chans:min(X.shape[-1], (cgi + 1) * max_n_chans)],
+				X_aug.shape[1:3] + (-1,)) # make sure we always have a chans dim
 
 			# if grayscale, make border value a single value
 			if curr_X.shape[-1] == 1:
-				curr_X = curr_X[:,:,0]
-				bv = border_val[0]
+				#curr_X = curr_X[:,:,0]
+				# TODO: a bit hacky, but grayscale images will probably want a black border...
+				bv = (0.,)
 			else:
 				bv = border_val
 
@@ -360,8 +366,9 @@ def aug_im_batch(
 			if len(curr_X.shape) < 3:
 				curr_X = np.expand_dims(curr_X, axis=-1)
 
-			X_out[bi, :, :, cgi*max_n_chans:(cgi + 1)*max_n_chans] = np.reshape(
-				curr_X, X_out[bi, :, :, cgi*max_n_chans:(cgi + 1)*max_n_chans].shape)
+			X_out[bi, :, :, cgi*max_n_chans:min(X.shape[-1], (cgi + 1)*max_n_chans)] \
+				= np.reshape(
+					curr_X, X_out[bi, :, :, cgi*max_n_chans:min(X.shape[-1], (cgi + 1)*max_n_chans)].shape)
 
 
 	X_out = np.clip(X_out, 0., 1.)

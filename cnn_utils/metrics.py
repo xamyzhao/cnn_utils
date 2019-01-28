@@ -15,6 +15,7 @@ def norm_vgg(x):
 	x_norm = tf.divide(x, x_norm)
 	return x_norm
 
+keras_imagenet_mean = [103.939, 116.779, 123.68]
 # truncated vgg implementation from guha
 def vgg_preprocess(arg):
 	import tensorflow as tf
@@ -26,7 +27,8 @@ def vgg_preprocess(arg):
 
 def vgg_preprocess_norm(arg):
 	import tensorflow as tf
-	z = 255.0 * (arg * 0.5 + 0.5)
+	z = tf.clip_by_value(arg, -1., 1.)
+	z = 255.0 * (z * 0.5 + 0.5)
 	b = z[:, :, :, 0] - 103.939
 	g = z[:, :, :, 1] - 116.779
 	r = z[:, :, :, 2] - 123.68
@@ -1323,9 +1325,11 @@ class CriticScore(object):
 def neg_mean_loss(y_true, y_pred):
 	return -K.mean(y_pred)
 
-
 def mean_loss(y_true, y_pred):
 	return K.mean(y_pred)
+
+def mean_diff(y_true, y_pred):
+	return K.mean(y_pred - y_true)
 
 
 def norm_diff(y_true, y_pred):

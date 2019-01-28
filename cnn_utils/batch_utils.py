@@ -203,7 +203,10 @@ def gen_batch(ims_data, labels_data,
 							Y[idxs],
 							label_mapping=labels_to_onehot_mapping)
 					else:
-						Y_batch = Y[idxs]
+						if isinstance(Y, np.ndarray):
+							Y_batch = Y[idxs]
+						else: # in case it's a list
+							Y_batch = [Y[idx] for idx in idxs]
 				labels_batches.append(Y_batch)
 		else:
 			labels_batches = None

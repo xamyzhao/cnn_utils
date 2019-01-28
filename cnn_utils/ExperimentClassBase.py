@@ -105,6 +105,10 @@ class Experiment(object):
 						self.logger.debug('FAILED TO LOAD WEIGHTS DIRECTLY')
 						if not init_layers:
 							sys.exit()
+					except IndexError:
+						self.logger.debug('FAILED TO LOAD WEIGHTS DIRECTLY')
+						if not init_layers:
+							sys.exit()
 					# self.logger.debug('FAILED loading weights, attempting to load model!')
 					# from keras.models import load_model
 					# m.summary(line_length=120)
@@ -129,10 +133,6 @@ class Experiment(object):
 		print('create_generators not implemented')
 
 	def compile_models(self):
-		self.logger.debug(
-			'Compiling generator with losses {} and weights {}'.format(
-				self.loss_functions, self.loss_weights))
-
 		with open(os.path.join(self.exp_dir, 'arch_params.json'), 'w') as f:
 			json.dump(self.arch_params, f)
 
