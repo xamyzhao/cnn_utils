@@ -54,7 +54,9 @@ def load_experiment_from_dir(from_dir, exp_class,
 	return exp, loaded_epoch
 
 def run_experiment(exp, run_args,
-                   end_epoch, save_every_n_epochs, test_every_n_epochs, early_stopping_eps=None):
+                   end_epoch,
+                   save_every_n_epochs, test_every_n_epochs,
+                   early_stopping_eps=None):
 	if run_args.debug:
 		if run_args.epoch is not None:
 			end_epoch = int(run_args.epoch) + 10
@@ -82,8 +84,10 @@ def run_experiment(exp, run_args,
 	exp_dir, figures_dir, logs_dir, models_dir = exp.get_dirs()
 
 	# log to the newly created experiments dir
-	formatter = logging.Formatter('[%(asctime)s] %(message)s', "%Y-%m-%d %H:%M:%S")
-	lfh = logging.FileHandler(filename=os.path.join(exp_dir, 'training.log'))
+	formatter = logging.Formatter(
+		'[%(asctime)s] %(message)s', "%Y-%m-%d %H:%M:%S")
+	lfh = logging.FileHandler(
+		filename=os.path.join(exp_dir, 'training.log'))
 	lsh = logging.StreamHandler(sys.stdout)
 	lfh.setFormatter(formatter)
 	lsh.setFormatter(formatter)

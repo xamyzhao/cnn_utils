@@ -34,6 +34,7 @@ def dilate_batch(X, ks):
 	X_temp = np.reshape(X_temp, (h, w, -1))
 	kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ks, ks))
 	#	X_temp = cv2.resize( X_temp, None, fx=scale_factor, fy=scale_factor )
+
 	X_temp = cv2.dilate(X_temp, kernel)
 	h_new = X_temp.shape[0]
 	w_new = X_temp.shape[1]
