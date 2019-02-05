@@ -72,6 +72,7 @@ def aug_params_to_transform_matrices(
 		max_shear=(0, 0),
 		apply_flip=(False, False),
 		integer_values=False,
+		add_last_row=False,
 	):
 	if not isinstance(scale_range, tuple) and not isinstance(scale_range,list):
 		scale_range = (1 - scale_range, 1 + scale_range)
@@ -115,6 +116,9 @@ def aug_params_to_transform_matrices(
 
 	if integer_values:
 		T = np.round(T).astype(int)
+
+	if add_last_row:
+		T = np.concatenate([T, np.tile(np.reshape([0, 0, 1], (1, 1, 3)), (T.shape[0], 1, 1))], axis=1)
 
 	return T, (thetas, scales, trans_x, trans_y, shear_x, shear_y, do_flip_horiz, do_flip_vert)
 
@@ -215,9 +219,13 @@ def aug_im_batch(
 		scale_range=(0, 0), max_noise_std=0., scale_range_horiz=(0,0), 
 		apply_blur = False, max_proj = 0., apply_flip = False, max_trans = 0., 
 		masks=None, 
-		border_val=(1., 1., 1.), rot_range = None):
+		border_val=1., rot_range = None):
 
 	batch_size = X.shape[0]
+
+	if not isinstance(border_val, list):
+		# should get one entry per channel
+		border_val = border_val * np.ones((X.shape[-1],))
 
 	aug_params = {
 		'scales': None,
@@ -273,17 +281,11 @@ def aug_im_batch(
 				X_aug[bi, :, :, cgi * max_n_chans:min(X.shape[-1], (cgi + 1) * max_n_chans)],
 				X_aug.shape[1:3] + (-1,)) # make sure we always have a chans dim
 
-			# if grayscale, make border value a single value
-			if curr_X.shape[-1] == 1:
-				#curr_X = curr_X[:,:,0]
-				# TODO: a bit hacky, but grayscale images will probably want a black border...
-				bv = (0.,)
-			else:
-				bv = border_val
+			curr_border_vals = tuple(border_val[cgi * max_n_chans: min(X.shape[-1], (cgi + 1) * max_n_chans)])
 
 			if crop_to_size_range is not None:
 				curr_X, crop_to_size, crop_center = augCrop(curr_X, 
-					pad_to_size=pad_to_size, crop_to_size_range=crop_to_size_range, border_color=bv)
+					pad_to_size=pad_to_size, crop_to_size_range=crop_to_size_range, border_color=curr_border_vals)
 				aug_params['crop_to_size'][bi] = crop_to_size
 				aug_params['crop_center'][bi] = crop_center
 
@@ -300,7 +302,7 @@ def aug_im_batch(
 				if cgi == 0:
 					rot_deg = np.random.rand(1) * (rot_range[1]-rot_range[0]) + rot_range[0]
 				curr_X,_, rotation_theta = augRotate(curr_X, None, 
-					degree_rand=rot_deg, border_color=bv)
+					degree_rand=rot_deg, border_color=curr_border_vals)
 				assert rotation_theta == rot_deg
 			
 				aug_params['rotations'][bi] = rotation_theta
@@ -308,7 +310,7 @@ def aug_im_batch(
 				if cgi == 0:
 					rot_deg = np.random.rand(1) * 2 * max_rot - max_rot
 				curr_X,_, rotation_theta = augRotate(curr_X, None, 
-					degree_rand=rot_deg, border_color=bv)
+					degree_rand=rot_deg, border_color=curr_border_vals)
 				aug_params['rotations'][bi] = rotation_theta
 			if max_proj > 0 or type(max_proj) == list:
 				curr_X, projection_theta = augProjective( curr_X, scale = 1., max_theta = max_proj, max_shear=None)
@@ -321,11 +323,11 @@ def aug_im_batch(
 	#			print('augmenting random scale = {}'.format(scale))
 				aug_params['scales'][bi] = scale
 				curr_X,_ = augScale(curr_X, None, scale_rand = scale, 
-					border_color=bv)
+					border_color=curr_border_vals)
 			if scale_range_horiz[0] > 0.:
 				scale_horiz = randScale(scale_range_horiz[0], scale_range_horiz[1])
 				curr_X,_ = augScale(curr_X, None, scale_rand = (scale_horiz, 1.), 
-					border_color=bv)
+					border_color=curr_border_vals)
 				
 			if masks is None:
 				if max_noise_std > 0:
@@ -354,7 +356,7 @@ def aug_im_batch(
 				if cgi == 0:
 					trans_y = int(np.random.rand(1) * 2*max_trans - max_trans)
 				aug_params['trans_y'][bi] = trans_y
-				curr_X, _ = augShift(curr_X, rand_shift=(trans_x, trans_y), border_color=bv)
+				curr_X, _ = augShift(curr_X, rand_shift=(trans_x, trans_y), border_color=curr_border_vals)
 
 			if max_sat > 0:
 				if cgi == 0:
@@ -365,7 +367,6 @@ def aug_im_batch(
 
 			if len(curr_X.shape) < 3:
 				curr_X = np.expand_dims(curr_X, axis=-1)
-
 			X_out[bi, :, :, cgi*max_n_chans:min(X.shape[-1], (cgi + 1)*max_n_chans)] \
 				= np.reshape(
 					curr_X, X_out[bi, :, :, cgi*max_n_chans:min(X.shape[-1], (cgi + 1)*max_n_chans)].shape)

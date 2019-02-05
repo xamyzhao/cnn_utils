@@ -99,7 +99,7 @@ def gen_batch(ims_data, labels_data,
               batch_size, target_size=None, randomize=False,
               normalize_tanh=False,
               labels_to_onehot_mapping=None,
-              aug_params=None, convert_onehot=False,
+              aug_model=None, aug_params=None, convert_onehot=False,
               yield_aug_params=False, yield_idxs=False,
               random_seed=None):
 	'''
@@ -190,7 +190,16 @@ def gen_batch(ims_data, labels_data,
 				X_batch = image_utils.normalize(X_batch)
 
 			if aug_params is not None and aug_params[i] is not None:
-				X_batch, out_aug_params[i] = aug_utils.aug_im_batch(X_batch, **aug_params[i])
+				if aug_model is not None:
+					# use the gpu aug model instead
+					T, _ = aug_utils.aug_params_to_transform_matrices(
+						batch_size=X_batch.shape[0], add_last_row=True,
+						**aug_params[i]
+					)
+					X_batch = aug_model.predict([X_batch, T])
+					out_aug_params[i] = T
+				else:
+					X_batch, out_aug_params[i] = aug_utils.aug_im_batch(X_batch, **aug_params[i])
 			ims_batches.append(X_batch)
 
 		if labels_data is not None:
