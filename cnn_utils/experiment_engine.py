@@ -40,7 +40,9 @@ def load_experiment_from_dir(from_dir, exp_class,
 
 	exp = exp_class(
 		data_params=fromdir_data_params, arch_params=fromdir_arch_params,
-	    prompt_delete=False, prompt_rename=True, # in case the experiment was renamed
+		loaded_from_dir=from_dir,
+	    prompt_delete_existing=False, # just continue in exactly the dir that was specified
+		prompt_update_name=True, # in case the experiment was renamed
 		log_to_dir=log_to_dir)
 
 	exp.load_data(load_n=load_n)

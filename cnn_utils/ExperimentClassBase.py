@@ -11,33 +11,33 @@ from cnn_utils import file_utils
 
 class Experiment(object):
 	def get_model_name(self):
+		# replace common tokens that cause issues with folder names. also replace common long strings
 		self.model_name = self.model_name.replace(' ', '') \
 			.replace(')', '').replace('(', '') \
 			.replace('[', '').replace(']', '') \
 			.replace(',', '-').replace("'", '') \
-			.replace('n_convs_per_stage', 'ncps').replace('enc_chans', 'enc').replace('use_upsample', 'upsamp')
+			.replace('n_convs_per_stage', 'ncps')\
+			.replace('enc_chans', 'enc')\
+			.replace('use_upsample', 'upsamp')
 		exp_name = self.model_name
 
 		return exp_name
 
-	def __init__(self, data_params, arch_params,
-	             exp_root='experiments', prompt_delete=False, prompt_rename=False, 
-				do_profile=False,
-				log_to_dir=True):
+	def __init__(self,
+	             data_params, arch_params,
+	             loaded_from_dir=None,
+	             exp_root='experiments',
+	             prompt_delete_existing=True, prompt_update_name=False,
+	             do_profile=False,
+	             do_logging=True):
 		self.do_profile = do_profile
-		self.log_to_dir = log_to_dir
+		self.do_logging = do_logging
 
 		self.arch_params = arch_params
 		self.data_params = data_params
 
-
-		# figure out model name0
+		# figure out model name
 		self.get_model_name()
-
-		if 'exp_dir' in self.arch_params.keys():
-			exp_dir = self.arch_params['exp_dir']
-		else:
-			exp_dir = None
 
 		# make directories to store outputs
 		self.model_name, \
@@ -45,11 +45,15 @@ class Experiment(object):
 		self.figures_dir, self.logs_dir, self.models_dir \
 			= file_utils.make_output_dirs(
 			self.model_name,
-			exp_root='./{}/'.format(exp_root), prompt_delete=prompt_delete, prompt_rename=prompt_rename, existing_exp_dir=exp_dir)
+			exp_root='./{}/'.format(exp_root),
+			prompt_delete_existing=prompt_delete_existing,
+			prompt_update_name=prompt_update_name,
+			existing_exp_dir=loaded_from_dir)
 
-		self.arch_params['exp_dir'] = self.exp_dir
-
+		# initialize a buffer in case we want to do early stopping based on validation loss
 		self.validation_losses_buffer = []
+
+		# point loggers at correct log files and stdout
 		self._init_logger()
 
 	def set_debug_mode(self, do_debug=True):
@@ -140,7 +144,7 @@ class Experiment(object):
 		if figs_dir is None:
 			figs_dir = self.exp_dir
 
-		# we might wnat to print some models but not save them all in self.models
+		# we might want to print some models but not save them all in self.models
 		if models_to_print is None and hasattr(self, 'models_to_print'):
 			models_to_print = self.models_to_print + self.models
 		elif models_to_print is None:
@@ -179,7 +183,7 @@ class Experiment(object):
 
 		if self.logger is None:
 			formatter = logging.Formatter('[%(asctime)s] %(message)s', "%Y-%m-%d %H:%M:%S")
-			if self.log_to_dir:
+			if self.do_logging:
 				lfh = logging.FileHandler(filename=os.path.join(self.exp_dir, 'experiment.log'))
 				lfh.setFormatter(formatter)
 				lfh.setLevel(logging.DEBUG)
@@ -191,13 +195,13 @@ class Experiment(object):
 			self.logger.setLevel(logging.DEBUG)
 			self.logger.handlers = []
 
-			if self.log_to_dir:
+			if self.do_logging:
 				self.logger.addHandler(lfh)
 
 			self.logger.addHandler(lsh)
 
 
-		if self.do_profile and self.log_to_dir:
+		if self.do_profile and self.do_logging:
 			formatter = logging.Formatter('[%(asctime)s] %(message)s', "%Y-%m-%d %H:%M:%S")
 			lfh = logging.FileHandler(filename=os.path.join(self.exp_dir, 'profiler.log'))
 			lfh.setFormatter(formatter)

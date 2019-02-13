@@ -4,9 +4,6 @@ import numpy as np
 from cnn_utils import classification_utils, image_utils, aug_utils
 
 
-# import mnist_data_utils
-
-
 def erode_batch(X, ks):
 	ks = int(ks)
 	n = X.shape[0]
@@ -96,31 +93,39 @@ def pad_or_crop_to_shape(X, out_shape, border_color=1.):
 
 
 def gen_batch(ims_data, labels_data,
-              batch_size, target_size=None, randomize=False,
-              normalize_tanh=False,
-              labels_to_onehot_mapping=None,
-              aug_model=None, aug_params=None, convert_onehot=False,
+              batch_size, randomize=False,
+              pad_or_crop_to_size=None, normalize_tanh=False,
+              convert_onehot=False, labels_to_onehot_mapping=None,
+              aug_model=None, aug_params=None,
               yield_aug_params=False, yield_idxs=False,
               random_seed=None):
 	'''
 
-	:param ims_data: list of images, or an image. If a single image, it will be automatically converted to a list
-	:param labels_data:
+	:param ims_data: list of images, or an image.
+	If a single image, it will be automatically converted to a list
+
+	:param labels_data: list of other data (e.g. labels) that do not require
+	image normalization or augmentation, but might need to be converted to onehot
+
 	:param batch_size:
-	:param target_size:
-	:param randomize:
-	:param normalize_tanh:
-	:param labels_to_onehot_mapping:
+	:param randomize: bool to randomize indices per batch
+
+	:param pad_or_crop_to_size: pad or crop each image in ims_data to the specified size. Default pad value is 0
+	:param normalize_tanh: normalize image to range [-1, 1], good for synthesis with a tanh activation
 	:param aug_params:
-	:param convert_onehot:
-	:param yield_aug_params:
-	:param yield_idxs:
+
+	:param convert_onehot: convert labels to a onehot representation using the mapping below
+	:param labels_to_onehot_mapping: list of labels e.g. [0, 3, 5] indicating the mapping of label values to channel indices
+
+	:param yield_aug_params: include the random augmentation params used on the batch in the return values
+	:param yield_idxs: include the indices that comprise this batch in the return values
 	:param random_seed:
 	:return:
 	'''
 	if random_seed:
 		np.random.seed(random_seed)
 
+	# make sure everything is a list
 	if not isinstance(ims_data, list):
 		ims_data = [ims_data]
 
@@ -136,11 +141,11 @@ def gen_batch(ims_data, labels_data,
 			assert len(aug_params) == len(ims_data)
 		out_aug_params = aug_params[:]
 
-	if target_size is not None:
-		if not isinstance(target_size, list):
-			target_size = [target_size] * len(ims_data)
+	if pad_or_crop_to_size is not None:
+		if not isinstance(pad_or_crop_to_size, list):
+			pad_or_crop_to_size = [pad_or_crop_to_size] * len(ims_data)
 		else:
-			assert len(target_size) == len(ims_data)
+			assert len(pad_or_crop_to_size) == len(ims_data)
 
 
 	# if we have labels that we want to generate from,
@@ -163,10 +168,10 @@ def gen_batch(ims_data, labels_data,
 	h = ims_data[0].shape[1]
 	w = ims_data[0].shape[2]
 
-	if target_size is not None:
+	if pad_or_crop_to_size is not None:
 		# pad each image and then re-concatenate
 		ims_data = [np.concatenate([
-			image_utils.pad_or_crop_to_shape(x, target_size)[np.newaxis]
+			image_utils.pad_or_crop_to_shape(x, pad_or_crop_to_size)[np.newaxis]
 			for x in im_data], axis=0) for im_data in ims_data]
 
 	while True:
@@ -234,8 +239,11 @@ def gen_batch(ims_data, labels_data,
 			yield tuple(ims_batches) + tuple(labels_batches)
 
 
-# def gen_aug_batch( batch_gen, include_noise_input = False, noise_size = 100 ):
-
+def _test_gen_batch():
+	'''
+	Unit test for gen_batch
+	:return:
+	'''
 
 def make_aug_batch(X):
 	X = image_utils.inverse_normalize(X)
