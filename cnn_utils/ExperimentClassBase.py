@@ -125,7 +125,7 @@ class Experiment(object):
 						sys.exit()
 
 			if not found_a_model:
-				self.logger.debug('Did not find any models with epoch {} in dir {}!'.format(load_epoch, models_dir))
+				self.logger.debug('Did not find any models with epoch {} in dir {}!'.format(load_epoch, self.models_dir))
 				load_epoch = 0
 
 			self.latest_epoch = int(load_epoch) + 1

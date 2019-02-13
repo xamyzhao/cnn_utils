@@ -29,7 +29,7 @@ def configure_gpus(gpus):
 def load_experiment_from_dir(from_dir, exp_class,
                              load_n=None,
                              load_epoch=None,
-                             log_to_dir=False,  # dont log if we are just loading this exp for evaluation
+                             do_logging=False,  # dont log if we are just loading this exp for evaluation
 							 do_load_models=True
                              ):
 	with open(os.path.join(from_dir, 'arch_params.json'), 'r') as f:
@@ -43,7 +43,7 @@ def load_experiment_from_dir(from_dir, exp_class,
 		loaded_from_dir=from_dir,
 	    prompt_delete_existing=False, # just continue in exactly the dir that was specified
 		prompt_update_name=True, # in case the experiment was renamed
-		log_to_dir=log_to_dir)
+		do_logging=do_logging)
 
 	exp.load_data(load_n=load_n)
 	exp.create_models()
