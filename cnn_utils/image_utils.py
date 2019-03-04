@@ -5,16 +5,6 @@ import numpy as np
 from scipy.ndimage import morphology as spndm
 import scipy.interpolate as spi
 
-# TODO: probably only works for 1-channel
-def resize(im, target_shape, interp_kind='cubic'):
-	xv, yv = np.meshgrid(np.asarray(list(range(im.shape[1]))), np.asarray(list(range(im.shape[0]))))
-	# this is better than scipy.misc.imresize since that does some normalization to 0-255
-	f = spi.interp2d(xv, yv, im, kind=interp_kind)
-	xnew = np.linspace(0, im.shape[1], target_shape[1], endpoint=False)
-	ynew = np.linspace(0, im.shape[0], target_shape[0], endpoint=False)
-	return f(xnew, ynew)
-	
-
 
 def pad_or_crop_to_shape(
 		I,

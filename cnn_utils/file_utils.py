@@ -1,11 +1,7 @@
 import json
 import os
 import re
-#def filenames_to_im_ids( fns ):
-#	return [ filename_to_id(fn) for fn in fns ]
 
-#def filename_to_id( fn ):
-#	return fn.split('_')[0]
 import numpy as np
 
 
