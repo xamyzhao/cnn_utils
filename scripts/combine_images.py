@@ -16,7 +16,7 @@ if __name__ == '__main__':
     ap.add_argument('-max_epoch', nargs='?', default=0, type=int, help='Max epoch number to include in plots')
     ap.add_argument('-range', nargs=2, default=[None, None], type=int, help='Start and end of epoch range to show')
     ap.add_argument('-out_names', nargs='*', default=[], type=str, help='Name of out file without extension')
-    ap.add_argument('-out_dir', default='~/public_html/lpat', type=str)
+    ap.add_argument('-out_dir', default='../public_html/lpat', type=str)
     ap.add_argument('-span', nargs='?', default=500, help='Number of frames to look back')
     args = ap.parse_args()
     prefixes = args.prefixes

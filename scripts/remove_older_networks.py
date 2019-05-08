@@ -79,10 +79,10 @@ if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     ap.add_argument('-nd', nargs='?', type=str, help='networks dir', default='./models')
     ap.add_argument('-od', nargs='?', type=str, help='figures dir', default='./figures')
-    ap.add_argument(['-mm', '--models_milestone'], nargs='?', type=int,
+    ap.add_argument('-mm', '--models_milestone', nargs='?', type=int,
                     help='save any files with epochs % milestone == 0',
                     default=100)
-    ap.add_argument(['-fm', '--figs_milestone'], nargs='?', type=int,
+    ap.add_argument('-fm', '--figs_milestone', nargs='?', type=int,
                     help='save any files with epochs % milestone == 0',
                     default=10)
     ap.add_argument('-model_num_prefix', nargs='?', type=str, help='number prefix e.g. epoch, batch, iter',
@@ -122,7 +122,7 @@ if __name__ == '__main__':
                                                      num_prefix=args.model_num_prefix,
                                                      milestone_interval=args.models_milestone,
                                                      num_recent_to_keep=num_models_to_keep,
-                                                     debug=args.test)
+                                                     debug=False)
         if args.do_remove_figures:
             fig_dirs = [os.path.join(exp_root, ed, figs_dirname) for ed in os.listdir(exp_root) \
                                 if os.path.isdir(os.path.join(exp_root, ed, figs_dirname))]
@@ -140,7 +140,7 @@ if __name__ == '__main__':
                                                      num_prefix=args.fig_num_prefix,
                                                      milestone_interval=args.figs_milestone,
                                                      num_recent_to_keep=num_figs_to_keep,
-                                                     debug=args.test)
+                                                     debug=False)
 
         print('Sleeping for 600s...')
         time.sleep(600)

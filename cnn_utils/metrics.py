@@ -42,11 +42,11 @@ def vgg_norm(shape=(64,64,3), normalized_inputs=False):
 	img_input = Input(shape=shape)
 
 	if normalized_inputs:
-		vgg_model_file = '~/evolving_wilds/cnn_utils/vgg_normtanh.h5'
+		vgg_model_file = '../evolving_wilds/cnn_utils/vgg_normtanh.h5'
 		img = Lambda(vgg_preprocess_norm,
 			name='lambda_preproc_norm-11')(img_input)
 	else:
-		vgg_model_file = '~/evolving_wilds/cnn_utils/vgg_01.h5'
+		vgg_model_file = '../evolving_wilds/cnn_utils/vgg_01.h5'
 		img = Lambda(vgg_preprocess,
 			name='lambda_preproc_clip01')(img_input)
 

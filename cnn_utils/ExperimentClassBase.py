@@ -50,6 +50,12 @@ class Experiment(object):
             prompt_update_name=prompt_update_name,
             existing_exp_dir=loaded_from_dir)
 
+        with open(os.path.join(self.exp_dir, 'data_params.json'), 'w') as f:
+            json.dump(self.data_params, f)
+
+        if isinstance(self.data_params, list):
+            self.data_params = self.data_params[0]
+
         # initialize a buffer in case we want to do early stopping based on validation loss
         self.validation_losses_buffer = []
 
@@ -63,8 +69,7 @@ class Experiment(object):
         return self.exp_dir, self.figures_dir, self.logs_dir, self.models_dir
 
     def load_data(self):
-        with open(os.path.join(self.exp_dir, 'data_params.json'), 'w') as f:
-            json.dump(self.data_params, f)
+        return None
 
     def _save_params(self):
         with open(os.path.join(self.exp_dir, 'arch_params.json'), 'w') as f:
@@ -72,8 +77,8 @@ class Experiment(object):
         with open(os.path.join(self.exp_dir, 'data_params.json'), 'w') as f:
             json.dump(self.data_params, f)
 
-    def create_models(self):
-        self._print_models()
+    def create_models(self, verbose=True):
+        self._print_models(do_display=verbose)
         return None
 
     def load_models(self, load_epoch=None, stop_on_missing=True, init_layers=False):
@@ -137,10 +142,12 @@ class Experiment(object):
         print('create_generators not implemented')
 
     def compile_models(self):
+        self.logger.debug('Compiling generator with losses {}, names {} and weights {}'.format(
+            self.loss_functions, self.loss_names, self.loss_weights))
         with open(os.path.join(self.exp_dir, 'arch_params.json'), 'w') as f:
             json.dump(self.arch_params, f)
 
-    def _print_models(self, save_figs=True, figs_dir=None, models_to_print=None):
+    def _print_models(self, save_figs=True, figs_dir=None, models_to_print=None, do_display=True):
         if figs_dir is None:
             figs_dir = self.exp_dir
 
@@ -151,8 +158,9 @@ class Experiment(object):
             models_to_print = self.models
 
         for m in models_to_print:
-            print(m.name)
-            m.summary(line_length=120)
+            if do_display:
+                print(m.name)
+                m.summary(line_length=120)
 
             if save_figs:
                 plot_model(

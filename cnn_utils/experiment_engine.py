@@ -30,7 +30,9 @@ def load_experiment_from_dir(from_dir, exp_class,
                              load_n=None,
                              load_epoch=None,
                              do_logging=False,  # dont log if we are just loading this exp for evaluation
-                             do_load_models=True
+                             do_load_models=True,
+                             prompt_update_name=True,
+                             verbose=True,
                              ):
     with open(os.path.join(from_dir, 'arch_params.json'), 'r') as f:
         fromdir_arch_params = json.load(f)
@@ -42,11 +44,11 @@ def load_experiment_from_dir(from_dir, exp_class,
         data_params=fromdir_data_params, arch_params=fromdir_arch_params,
         loaded_from_dir=from_dir,
         prompt_delete_existing=False, # just continue in exactly the dir that was specified
-        prompt_update_name=True, # in case the experiment was renamed
+        prompt_update_name=prompt_update_name, # in case the experiment was renamed
         do_logging=do_logging)
 
     exp.load_data(load_n=load_n)
-    exp.create_models()
+    exp.create_models(verbose=verbose)
 
     if do_load_models:
         loaded_epoch = exp.load_models(load_epoch)
@@ -156,6 +158,9 @@ def run_experiment(exp, run_args,
     return exp_dir
 
 
+
+
+
 def train_using_fit_generator(
         exp, batch_size,
         start_epoch, end_epoch,
@@ -248,7 +253,7 @@ def train_using_fit_generator(
         my_callbacks.TensorBoard_ScalarLosses(
             tbw,
             loss_names=['train_' + ln for ln in exp.loss_names],  # \
-            #				 + ['val_' + ln for ln in exp.loss_names],
+            #                 + ['val_' + ln for ln in exp.loss_names],
             start_iter=start_epoch * n_batch_per_epoch,
         ),
         # TODO: early stopping
@@ -301,10 +306,10 @@ def train_batch_by_batch(
     min_save_every_n_epochs = 10
     save_every_n_seconds = 20 * 60
 
-    #	print_n_batches_per_epoch = max(1, max_printed_examples / batch_size)
+    #    print_n_batches_per_epoch = max(1, max_printed_examples / batch_size)
     # we don't want more than 64 images printed per epoch
-    #	print_every = int(np.floor(
-    #					((n_batch_per_epoch_train-1) / print_n_batches_per_epoch) / 2)) * 2 + 1  # make this odd so we can print augmentations
+    #    print_every = int(np.floor(
+    #                    ((n_batch_per_epoch_train-1) / print_n_batches_per_epoch) / 2)) * 2 + 1  # make this odd so we can print augmentations
 
     start_time = time.time()
 

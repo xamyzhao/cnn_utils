@@ -103,7 +103,7 @@ def make_output_dirs(experiment_base_name: str,
 			target_exp_dir = os.path.join(exp_root, experiment_base_name)
 
 			# if it has changed, we should prompt to rename the old experiment to the new one
-			if prompt_update_name:
+			if prompt_update_name and not os.path.abspath(existing_exp_dir) == os.path.abspath(target_exp_dir):
 				target_exp_dir, do_rename = _prompt_rename(
 					existing_exp_dir, target_exp_dir, debug_rename_input)
 

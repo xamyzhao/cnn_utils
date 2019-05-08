@@ -67,12 +67,22 @@ def resize_batch(X, scale_factor):
     h = X.shape[1]
     w = X.shape[2]
     c = X.shape[3]
+
+    max_chans = 100
     X_temp = np.transpose(X, (1, 2, 3, 0))
     X_temp = np.reshape(X_temp, (h, w, c * n))
-    if np.max(X_temp) <= 1.0:
-        X_temp = cv2.resize(X_temp * 255, None, fx=scale_factor, fy=scale_factor) / 255.
-    else:
-        X_temp = cv2.resize(X_temp, None, fx=scale_factor, fy=scale_factor)
+    X_resized = []
+    # do this in batches
+    for bi in range(int(np.ceil(c * n / float(max_chans)))):
+        X_batch = X_temp[..., bi * max_chans : min((bi + 1) * max_chans, X_temp.shape[-1])]
+        n_batch_chans = X_batch.shape[-1]
+
+        if np.max(X_batch) <= 1.0:
+            X_batch = cv2.resize(X_batch * 255, None, fx=scale_factor, fy=scale_factor) / 255.
+        else:
+            X_batch = cv2.resize(X_batch, None, fx=scale_factor, fy=scale_factor)
+        X_resized.append(np.reshape(X_batch, X_batch.shape[:2] + (n_batch_chans,)))
+    X_temp = np.concatenate(X_resized, axis=-1)
     h_new = X_temp.shape[0]
     w_new = X_temp.shape[1]
     X_out = np.reshape(X_temp, (h_new, w_new, c, n))
