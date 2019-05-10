@@ -39,6 +39,8 @@ def pad_or_crop_to_shape(
 
 
 def normalize(X):
+    if not X.dtype == np.float32 and not X.dtype == np.float64:
+        X = X.astype(np.float32) / 255.
     if X is None:
         return None
     return np.clip(X * 2.0 - 1.0, -1., 1.)

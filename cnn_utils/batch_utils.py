@@ -199,7 +199,7 @@ def gen_batch(ims_data, labels_data,
             X_batch = im_data[idxs]
 
             if not X_batch.dtype == np.float32 and not X_batch.dtype == np.float64:
-                X_batch = (X_batch / 255.).astype(np.float32)
+                X_batch = X_batch.astype(np.float32) / 255.
 
             if normalize_tanh[i]:
                 X_batch = image_utils.normalize(X_batch)

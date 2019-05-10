@@ -81,7 +81,7 @@ if __name__ == '__main__':
     ap.add_argument('-od', nargs='?', type=str, help='figures dir', default='./figures')
     ap.add_argument('-mm', '--models_milestone', nargs='?', type=int,
                     help='save any files with epochs % milestone == 0',
-                    default=100)
+                    default=10)
     ap.add_argument('-fm', '--figs_milestone', nargs='?', type=int,
                     help='save any files with epochs % milestone == 0',
                     default=10)

@@ -108,20 +108,20 @@ def encoder(x, img_shape,
         conv_chans = [conv_chans] * (n_convs - 1) + [min_c]
 
     for i in range(len(conv_chans)):
-        if n_convs_per_stage is not None and n_convs_per_stage > 1 or use_maxpool and n_convs_per_stage is not None:
-            for ci in range(n_convs_per_stage):
-                x = myConv(nf=conv_chans[i], ks=ks, strides=1, n_dims=n_dims,
-                           prefix='{}_enc'.format(prefix),
-                           suffix='{}_{}'.format(i, ci + 1))(x)
+        #if n_convs_per_stage is not None and n_convs_per_stage > 1 or use_maxpool and n_convs_per_stage is not None:
+        for ci in range(n_convs_per_stage):
+            x = myConv(nf=conv_chans[i], ks=ks, strides=1, n_dims=n_dims,
+                       prefix='{}_enc'.format(prefix),
+                       suffix='{}_{}'.format(i, ci + 1))(x)
 
-                if ci == 0 and use_residuals:
-                    residual_input = x
-                elif ci == n_convs_per_stage - 1 and use_residuals:
-                    x = Add(name='{}_enc_{}_add_residual'.format(prefix, i))([residual_input, x])
+            if ci == 0 and use_residuals:
+                residual_input = x
+            elif ci == n_convs_per_stage - 1 and use_residuals:
+                x = Add(name='{}_enc_{}_add_residual'.format(prefix, i))([residual_input, x])
 
-                if use_batchnorm:
-                    x = BatchNormalization()(x)
-                x = LeakyReLU(0.2, name='{}_enc_leakyrelu_{}_{}'.format(prefix, i, ci + 1))(x)
+            if use_batchnorm:
+                x = BatchNormalization()(x)
+            x = LeakyReLU(0.2, name='{}_enc_leakyrelu_{}_{}'.format(prefix, i, ci + 1))(x)
 
         if return_skips:
             skip_layers.append(x)
