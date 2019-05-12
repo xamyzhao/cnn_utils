@@ -337,7 +337,7 @@ def aug_im_batch(
                     rand_cs = rand_colorspace()
                     rand_c = rand_channels(rand_cs)
                     rand_sat = np.random.rand(1) * 2. * max_sat - max_sat + 1.0
-                curr_X = augSaturation( curr_X, aug_percent=rand_sat, aug_colorspace=rand_cs,aug_channels=rand_c)
+                curr_X = augSaturation(curr_X, aug_percent=rand_sat, aug_colorspace=rand_cs, aug_channels=rand_c)
 
             if len(curr_X.shape) < 3:
                 curr_X = np.expand_dims(curr_X, axis=-1)
