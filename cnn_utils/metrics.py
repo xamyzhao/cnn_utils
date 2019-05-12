@@ -445,16 +445,15 @@ class TimeSliceLoss(object):
 
 
 class TimeSummedLoss(object):
-	def __init__(self, loss_fn, n_frames=None,
-			time_axis=-2, compute_mean=True, pad_amt=None,
-	        include_frames=None,
-		):
+	def __init__(self, loss_fn,
+	             time_axis=-2, compute_mean=True, pad_amt=None,
+	             compute_over_frame_idxs=None,
+	             ):
 		self.time_axis = time_axis
-		self.n_frames = n_frames
 		self.loss_fn = loss_fn
 		self.compute_mean = compute_mean	
 		self.pad_amt = pad_amt
-		self.include_frames = include_frames
+		self.include_frames = compute_over_frame_idxs
 
 	def compute_loss(self, y_true, y_pred):
 		if self.pad_amt is not None:
