@@ -15,25 +15,28 @@ class AreaDistributionLoss(object):
       self.ratio_mu = ratio_mu
       self.ratio_sigma = ratio_sigma
       self.delta_thresh = delta_thresh
-       self.n_frame_chans = n_frame_chans
+      self.n_frame_chans = n_frame_chans
 
 
-   def compute_loss(self, _, y_pred):
+   def compute_loss(self, y_true, y_pred):
       eps = 1e-8
       pred_attns, pred_frame_deltas = tf.split(y_pred, [1, self.n_frame_chans], axis=-1)
       pred_frame_deltas = tf.abs(pred_frame_deltas)
 
       mask = tf.ones_like(y_pred)
-      frame_deltas_avgchans = tf.reduce_max(pred_frame_deltas, axis=-1, keepdims=True)
-      frame_deltas_binarized = tf.gather(mask, tf.where(frame_deltas_avgchans > delta_thresh))
-      frame_deltas_area = tf.reduce_sum(frame_deltas_binarized, axis=[1, 2, 3])
+      frame_deltas_maxchans = tf.reduce_max(pred_frame_deltas, axis=-1, keepdims=False)
+      #frame_deltas_binarized = tf.gather(
+      #  mask, tf.where(frame_deltas_avgchans > self.delta_thresh))
+      #frame_deltas_binarized = tf.nn.sigmoid(frame_deltas_avgchans - self.delta_thresh)
 
-      attns_area = tf.reduce_sum(pred_attns, axis=[1, 2, 3])
+      frame_deltas_binarized = tf.where(frame_deltas_maxchans > self.delta_thresh, tf.ones_like(frame_deltas_maxchans), tf.zeros_like(frame_deltas_maxchans))
+      frame_deltas_area = tf.reduce_sum(frame_deltas_binarized, axis=[1, 2], keepdims=False)      
+      attns_area = tf.reduce_sum(pred_attns, axis=[1, 2, 3], keepdims=False)
       delta_attn_area_ratios = frame_deltas_area / (attns_area + eps)
 
-      ratio_likelihoods = tf.exp(- tf.square(delta_attn_area_ratios - self.ratio_mu) / (2 * self.ratio_sigma ** 2))
+      ratio_log_likelihoods = -tf.square(delta_attn_area_ratios - self.ratio_mu) / (2 * self.ratio_sigma ** 2)
 
-      return tf.reduce_mean(ratio_likelihoods)
+      return -tf.reduce_mean(ratio_log_likelihoods)
 
 
 def norm_vgg(x):
