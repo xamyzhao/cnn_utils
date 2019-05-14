@@ -493,7 +493,7 @@ class TimeSummedLoss(object):
             y_true = tf.pad(y_true, paddings=self.pad_amt, constant_values=1.)
             y_pred = tf.pad(y_pred, paddings=self.pad_amt, constant_values=1.)
 
-        n_frames = y_pred.get_shape().as_list()[time_axis]
+        n_frames = y_pred.get_shape().as_list()[self.time_axis]
         if self.include_frames is None:
             include_frames = list(range(n_frames))
         else:
