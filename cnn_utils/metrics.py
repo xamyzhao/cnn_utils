@@ -26,10 +26,15 @@ class AreaDistributionLoss(object):
         # absolute delta
         pred_frame_deltas = tf.abs(pred_frame_deltas)
 
-        frame_deltas_maxchans = tf.reduce_max(pred_frame_deltas, axis=-1, keepdims=False)
+        frame_deltas_maxchans = tf.reduce_max(pred_frame_deltas, axis=-1, keepdims=True)
 
-        frame_deltas_binarized = tf.where(frame_deltas_maxchans > self.delta_thresh, tf.ones_like(frame_deltas_maxchans), tf.zeros_like(frame_deltas_maxchans))
-        frame_deltas_area = tf.reduce_sum(frame_deltas_binarized, axis=[1, 2], keepdims=False)        
+        frame_deltas_binarized = tf.sigmoid(100. * (frame_deltas_maxchans - self.delta_thresh))
+        #frame_deltas_binarized = tf.where(frame_deltas_maxchans > self.delta_thresh, tf.ones_like(frame_deltas_maxchans), tf.zeros_like(frame_deltas_maxchans))
+        
+        # take only frame deltas within the attention map
+        frame_deltas_binarized = frame_deltas_binarized * pred_attns
+
+        frame_deltas_area = tf.reduce_sum(frame_deltas_binarized, axis=[1, 2, 3], keepdims=False)        
         attns_area = tf.reduce_sum(pred_attns, axis=[1, 2, 3], keepdims=False)
         delta_attn_area_ratios = frame_deltas_area / (attns_area + eps)
 
