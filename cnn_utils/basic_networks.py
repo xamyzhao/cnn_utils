@@ -309,6 +309,7 @@ def decoder(x,
             n_convs_per_stage=1,
             include_dropout=False,
             ks=3,
+            last_ks=3,
             include_skips=None,
             use_residuals=False,
             use_upsample=False,
@@ -435,7 +436,7 @@ def decoder(x,
 
 
     # last stage of convolutions, no more upsampling
-    x = myConv(output_shape[-1], ks=ks, n_dims=n_dims,
+    x = myConv(output_shape[-1], ks=last_ks, n_dims=n_dims,
                strides=1,
                prefix=prefix,
                suffix='final',
