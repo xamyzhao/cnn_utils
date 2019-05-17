@@ -309,7 +309,6 @@ def decoder(x,
             n_convs_per_stage=1,
             include_dropout=False,
             ks=3,
-            last_ks=3,
             include_skips=None,
             use_residuals=False,
             use_upsample=False,
@@ -325,6 +324,11 @@ def decoder(x,
         conv_chans = [conv_chans] * n_convs
     elif type(conv_chans) == list:
         n_convs = len(conv_chans)
+
+    if isinstance(ks, list):
+        assert len(ks) == (n_convs + 1)  # specify for each conv, as well as the last one
+    else:
+        ks = [ks] * (n_convs + 1)
 
     # compute default sizes that we want on the way up, mainly in case we have more convs than stages
     # and we upsample past the output size
@@ -372,13 +376,13 @@ def decoder(x,
     for i in range(n_convs):
         print(x.get_shape())
         if np.all(curr_shape == output_shape[:len(curr_shape)]):
-            x = myConv(conv_chans[i], n_dims=n_dims, ks=ks, strides=1, prefix=prefix, suffix=i)(x)
+            x = myConv(conv_chans[i], n_dims=n_dims, ks=ks[i], strides=1, prefix=prefix, suffix=i)(x)
             x = LeakyReLU(0.2, name='{}_leakyrelu_{}'.format(prefix, i))(x)  # changed 5/15/2018, will break old models
         else:
             if not use_upsample:
                 # if we have convolutional filters left at the end, just apply them at full resolution
                 x = myConvTranspose(conv_chans[i], n_dims=n_dims,
-                                    ks=ks, strides=2,
+                                    ks=ks[i], strides=2,
                                     prefix=prefix, suffix=i,
                                     )(x)
                 x = LeakyReLU(0.2, name='{}_leakyrelu_{}'.format(prefix, i))(x)  # changed 5/15/2018, will break old models
@@ -417,7 +421,7 @@ def decoder(x,
 
         for ci in range(n_convs_per_stage):
             x = myConv(conv_chans[i],
-                       ks=ks,
+                       ks=ks[i],
                        strides=1,
                        n_dims=n_dims,
                        prefix=prefix,
@@ -434,17 +438,12 @@ def decoder(x,
             x = Dropout(0.3)(x)
 
 
-
     # last stage of convolutions, no more upsampling
-    x = myConv(output_shape[-1], ks=last_ks, n_dims=n_dims,
+    x = myConv(output_shape[-1], ks=ks[-1], n_dims=n_dims,
                strides=1,
                prefix=prefix,
                suffix='final',
                )(x)
-    # TODO: is this what we want? probably dont want any repeated convs with 3 channels or whatever...
-    #for ci in range(n_convs_per_stage - 1):
-    #	x = LeakyReLU(0.2, name='{}_leakyrelu_final_{}'.format(prefix, ci + 1))(x)
-    #	x = myConv(img_shape[-1], ks=ks, strides=1, n_dims=n_dims, prefix=prefix, suffix='final_{}'.format(ci + 1))(x)
 
     return x
 

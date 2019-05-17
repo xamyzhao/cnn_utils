@@ -131,7 +131,10 @@ def vgg_norm(shape=(64,64,3), normalized_inputs=False):
         l.set_weights(weights)
         print('Copying imagenet weights for layer {}: {}'.format(li, l.name))
         l.trainable = False
-    model.save(vgg_model_file)
+
+    if not os.path.isfile(vgg_model_file):
+        model.save(vgg_model_file)
+
     return model
 
 
