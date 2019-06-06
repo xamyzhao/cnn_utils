@@ -127,15 +127,16 @@ def encoder(x, img_shape,
             skip_layers.append(x)
             concat_skip_sizes.append(np.asarray(x.get_shape().as_list()[1:-1]))
 
-        if use_maxpool:
+        if use_maxpool and i < len(conv_chans) - 1:
+            # changed 5/30/19, don't pool after our last conv
             x = myPool(n_dims=n_dims, prefix=prefix, suffix=i)(x)
         else:
             x = myConv(conv_chans[i], ks=ks, strides=2, n_dims=n_dims,
                        prefix='{}_enc'.format(prefix), suffix=i)(x)
 
-        # don't activate right after a maxpool, it makes no sense
-        if not use_maxpool and i < len(conv_chans) - 1:  # no activation on last convolution
-            x = LeakyReLU(0.2, name='{}_enc_leakyrelu_{}'.format(prefix, i))(x)
+            # don't activate right after a maxpool, it makes no sense
+            if i < len(conv_chans) - 1:  # no activation on last convolution
+                x = LeakyReLU(0.2, name='{}_enc_leakyrelu_{}'.format(prefix, i))(x)
 
     if min_c is not None and min_c > 0:
         # if the last number of channels is specified, convolve to that
@@ -330,6 +331,7 @@ def decoder(x,
     else:
         ks = [ks] * (n_convs + 1)
 
+    print('Decoding with conv filters {}'.format(conv_chans))
     # compute default sizes that we want on the way up, mainly in case we have more convs than stages
     # and we upsample past the output size
     if n_dims == 2:
@@ -348,6 +350,7 @@ def decoder(x,
                 min(output_shape[2], int(encoded_shape[2] * 2. ** (i + 1))))
             for i in range(n_convs - 1)] + [output_shape[:3]])
 
+    print(default_target_vol_sizes)
     # automatically stop when we reach the desired image shape
     # TODO: is this desirable behavior?
     for vi, vs in enumerate(default_target_vol_sizes):
