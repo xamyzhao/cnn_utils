@@ -339,7 +339,7 @@ def decoder(x,
         default_target_vol_sizes = np.asarray(
             [(int(encoded_shape[0] * 2. ** (i + 1)), int(encoded_shape[1] * 2. ** (i + 1)))
              for i in range(n_convs - 1)] + [output_shape[:2]])
-    elif n_dims == 3:
+    else:
         print(output_shape)
         print(encoded_shape)
         # just upsample by a factor of 2 and then crop the final volume to the desired volume
@@ -350,9 +350,7 @@ def decoder(x,
                 min(output_shape[2], int(encoded_shape[2] * 2. ** (i + 1))))
             for i in range(n_convs - 1)] + [output_shape[:3]])
 
-    print(default_target_vol_sizes)
     # automatically stop when we reach the desired image shape
-    # TODO: is this desirable behavior?
     for vi, vs in enumerate(default_target_vol_sizes):
         if np.all(vs >= output_shape[:-1]):
             default_target_vol_sizes[vi] = output_shape[:-1]
@@ -361,66 +359,43 @@ def decoder(x,
     if target_vol_sizes is None:
         target_vol_sizes = default_target_vol_sizes
     else:
-        print('Target encoder vols to match: {}'.format(target_vol_sizes))
+        print('Target concat vols to match shapes to: {}'.format(target_vol_sizes))
         # fill in any Nones that we might have in our target_vol_sizes
         filled_target_vol_sizes = default_target_vol_sizes[:]
         for i in range(n_convs - 1):
             if i < len(target_vol_sizes) and target_vol_sizes[i] is not None:
                 filled_target_vol_sizes[i] = target_vol_sizes[i]
         target_vol_sizes = filled_target_vol_sizes
-    # target_vol_sizes = np.asarray(list(reversed([(int(np.ceil(img_shape[0]/2.0**i)), int(np.ceil(img_shape[1]/2.0**i))) \
-    # 	for i in range(0, len(conv_chans) + 1)])))
 
-    # curr_h = encoding_vol_sizes[-1] * 2
-    print('Target encoder vols to match: {}'.format(target_vol_sizes))
     if include_skips is not None:
         print('Concatentating with skips {}'.format([s for s in include_skips if s is not None]))
+
     curr_shape = np.asarray(encoded_shape[:n_dims])
     for i in range(n_convs):
-        print(x.get_shape())
-        if np.all(curr_shape == output_shape[:len(curr_shape)]):
-            x = myConv(conv_chans[i], n_dims=n_dims, ks=ks[i], strides=1, prefix=prefix, suffix=i)(x)
-            x = LeakyReLU(0.2, name='{}_leakyrelu_{}'.format(prefix, i))(x)  # changed 5/15/2018, will break old models
-        else:
-            if not use_upsample:
-                # if we have convolutional filters left at the end, just apply them at full resolution
-                x = myConvTranspose(conv_chans[i], n_dims=n_dims,
-                                    ks=ks[i], strides=2,
-                                    prefix=prefix, suffix=i,
-                                    )(x)
-                x = LeakyReLU(0.2, name='{}_leakyrelu_{}'.format(prefix, i))(x)  # changed 5/15/2018, will break old models
+        if i < len(target_vol_sizes) and target_vol_sizes[i] is not None:
+            x = _pad_or_crop_to_shape(x, curr_shape, target_vol_sizes[i])
+            curr_shape = np.asarray(target_vol_sizes[i])  # we will upsample first thing next stage
+
+        # if we want to concatenate with another volume (e.g. from encoder, or a downsampled input)...
+        if include_skips is not None and i < len(include_skips) and include_skips[i] is not None:
+            x_shape = x.get_shape().as_list()
+            skip_shape = include_skips[i].get_shape().as_list()
+
+            print('Attempting to concatenate current layer {} with previous skip connection {}'.format(x_shape, skip_shape))
+            # input size might not match in time dimension, so just tile it
+            if n_samples > 1:
+                tile_factor = [1] + [n_samples] + [1] * (len(x_shape)-1)
+                print('Tiling by {}'.format(tile_factor))
+                print(target_vol_sizes[i])
+                skip = Lambda(lambda y: K.expand_dims(y, axis=1))(include_skips[i])
+                skip = Lambda(lambda y:tf.tile(y, tile_factor), name='{}_lambdatilesamples_{}'.format(prefix,i),
+                    output_shape=[n_samples] + skip_shape[1:]
+                    )(skip)
+                skip = Lambda(lambda y:tf.reshape(y, [-1] + skip_shape[1:]), output_shape=skip_shape[1:])(skip)
             else:
-                x = myUpsample(size=2, n_dims=n_dims, prefix=prefix, suffix=i)(x)
-            curr_shape *= 2
+                skip = include_skips[i]
 
-            # if we want to concatenate with something from the encoder...
-            if i < len(target_vol_sizes) and target_vol_sizes[i] is not None:
-                x = _pad_or_crop_to_shape(x, curr_shape, target_vol_sizes[i])
-                curr_shape = np.asarray(target_vol_sizes[i])  # we will upsample first thing next stage
-
-            if include_skips is not None and i < len(include_skips) and include_skips[i] is not None:
-                # TODO: move tiling logic outside of this basic network?
-                x_shape = x.get_shape().as_list()
-                skip_shape = include_skips[i].get_shape().as_list()
-
-                print('Attempting to concatenate current layer {} with previous skip connection {}'.format(x_shape, skip_shape))
-                # input size might not match in time dimension, so just tile it
-                if n_samples > 1:
-                    tile_factor = [1] + [n_samples] + [1] * (len(x_shape)-1)
-                    print('Tiling by {}'.format(tile_factor))
-                    print(target_vol_sizes[i])
-                    skip = Lambda(lambda y: K.expand_dims(y, axis=1))(include_skips[i])
-                    skip = Lambda(lambda y:tf.tile(y, tile_factor), name='{}_lambdatilesamples_{}'.format(prefix,i),
-                        output_shape=[n_samples] + skip_shape[1:]
-                        )(skip)
-                    skip = Lambda(lambda y:tf.reshape(y, [-1] + skip_shape[1:]), output_shape=skip_shape[1:])(skip)
-                    #skip = Lambda(lambda y:tf.reshape(y, [-1] + skip_shape[1:]), output_shape=skip_shape[1:])(skip)
-                    print(skip.get_shape())
-                    #skip = Reshape(x_shape[1:])(skip)
-                else:
-                    skip = include_skips[i]
-                #skip = include_skips[i]
-                x = Concatenate(axis=-1, name='{}_concatskip_{}'.format(prefix, i))([x, skip])
+            x = Concatenate(axis=-1, name='{}_concatskip_{}'.format(prefix, i))([x, skip])
 
         for ci in range(n_convs_per_stage):
             x = myConv(conv_chans[i],
@@ -440,6 +415,18 @@ def decoder(x,
         if include_dropout and i < 2:
             x = Dropout(0.3)(x)
 
+        # if we are not at the output resolution yet, upsample or do a transposed convolution
+        if not np.all(curr_shape == output_shape[:len(curr_shape)]):
+            if not use_upsample:
+                # if we have convolutional filters left at the end, just apply them at full resolution
+                x = myConvTranspose(conv_chans[i], n_dims=n_dims,
+                                    ks=ks[i], strides=2,
+                                    prefix=prefix, suffix=i,
+                                    )(x)
+                x = LeakyReLU(0.2, name='{}_leakyrelu_{}'.format(prefix, i))(x)  # changed 5/15/2018, will break old models
+            else:
+                x = myUpsample(size=2, n_dims=n_dims, prefix=prefix, suffix=i)(x)
+            curr_shape *= 2
 
     # last stage of convolutions, no more upsampling
     x = myConv(output_shape[-1], ks=ks[-1], n_dims=n_dims,
