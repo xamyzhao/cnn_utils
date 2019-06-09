@@ -1,5 +1,9 @@
 from basic_network_utils import CVAE_modules
 
+import sys
+sys.path.append('../evolving_wilds')
+from cnn_utils import metrics
+
 class CVAE(object):
     def __init__(self,
                  ae_input_shapes,
@@ -23,8 +27,11 @@ class CVAE(object):
                  clip_output_range=None,
         ):
         self.conditioning_input_shapes = [tuple(s) for s in conditioning_input_shapes]
+        self.conditioning_input_names = conditioning_input_names
 
         self.ae_input_shapes = ae_input_shapes
+        self.ae_input_names = ae_input_names
+
         self.output_shape = output_shape
         self.n_outputs = n_outputs # in case we need to return copies of the transformed image for multiple losses
 
@@ -75,6 +82,7 @@ class CVAE(object):
         self.transform_enc_model = \
             CVAE_modules.transform_encoder_model(
                 input_shapes=self.ae_input_shapes,
+                input_names=self.ae_input_names,
                 latent_shape=self.transform_latent_shape,
                 model_name='{}_transform_encoder_cvae'.format(self.transform_name),
                 enc_params=self.transform_enc_params)
@@ -82,6 +90,7 @@ class CVAE(object):
         self.transformer_model = \
             CVAE_modules.transformer_model(
                 conditioning_input_shapes=self.conditioning_input_shapes,
+                conditioning_input_names=self.conditioning_input_names,
                 output_shape=self.output_shape,
                 source_input_idx=self.source_im_idx,
                 mask_by_conditioning_input_idx=self.mask_im_idx,
@@ -97,70 +106,26 @@ class CVAE(object):
         )
 
     def create_train_wrapper(self, n_samples=1):
-        if self.use_input_stack:
-            print('Creating trainer model with stacked input {}'.format(self.ae_input_shape))
-
         self.trainer_model = \
-            VTE_network_modules.VTE_transformer_train_model(
-                use_input_stack=self.use_input_stack,
-                img_shape=self.img_shape,
-                input_shape=self.ae_input_shape,
+            CVAE_modules.cvae_trainer_wrapper(
+                ae_input_shapes=self.ae_input_shapes,
+                ae_input_names=self.ae_input_names,
+                conditioning_input_shapes=self.conditioning_input_shapes,
+                conditioning_input_names=self.conditioning_input_names,
                 output_shape=self.output_shape,
                 model_name='{}_transformer_cvae_trainer'.format(self.transform_name),
-                vte_transform_encoder_model=self.transform_enc_model,
-                vte_transformer_test_model=self.transformer_model,
-                apply_flow_transform=self.transform_type == 'flow',
-                apply_color_transform=self.transform_type == 'color',
-                learn_transform_mask=self.learn_transform_mask,
-                include_transform_loss=True,
-                color_transform_type=self.color_transform_type,
+                transform_encoder_model=self.transform_enc_model,
+                transformer_model=self.transformer_model,
+                transform_type=self.transform_type,
                 transform_latent_shape=self.transform_latent_shape,
-                include_aug_matrix=self.include_aug_matrix, aug_pad_vals=self.aug_pad_vals,
-                n_samples=n_samples,
+                include_aug_matrix=self.include_aug_matrix,
                 n_outputs=self.n_outputs
             )
-        if n_samples > 1:
-            # annoyingly, keras' predict function expects the same output batch size as input batch size,
-            # so we need a wrapper that does not return multiple samples
-            # this should keep all loaded weights since it wraps the encoder and decoder
-            self.trainer_onesample_noaug_model = \
-                VTE_network_modules.VTE_transformer_train_model(
-                    use_input_stack=self.use_input_stack,
-                    img_shape=self.img_shape,
-                    input_shape=self.ae_input_shape,
-                    model_name='{}_transformer_cvae_trainer'.format(self.transform_name),
-                    vte_transform_encoder_model=self.transform_enc_model,
-                    vte_transformer_test_model=self.transformer_model,
-                    apply_flow_transform=self.transform_type == 'flow',
-                    apply_color_transform=self.transform_type == 'color',
-                    learn_transform_mask=self.learn_transform_mask,
-                    include_transform_loss=True,
-                    color_transform_type=self.color_transform_type,
-                    transform_latent_shape=self.transform_latent_shape,
-                    include_aug_matrix=False, aug_pad_vals=self.aug_pad_vals,
-                    n_samples=1
-                )
-            self.trainer_onesample_model = \
-                VTE_network_modules.VTE_transformer_train_model(
-                    use_input_stack=self.use_input_stack,
-                    img_shape=self.img_shape,
-                    input_shape=self.ae_input_shape,
-                    model_name='{}_transformer_cvae_trainer'.format(self.transform_name),
-                    vte_transform_encoder_model=self.transform_enc_model,
-                    vte_transformer_test_model=self.transformer_model,
-                    apply_flow_transform=self.transform_type == 'flow',
-                    apply_color_transform=self.transform_type == 'color',
-                    learn_transform_mask=self.learn_transform_mask,
-                    include_transform_loss=True,
-                    color_transform_type=self.color_transform_type,
-                    transform_latent_shape=self.transform_latent_shape,
-                    include_aug_matrix=self.include_aug_matrix, aug_pad_vals=self.aug_pad_vals,
-                    n_samples=1
-                )
 
         # TODO: include the conditional encoder if we have an AVAE
-        self.tester_model = VTE_network_modules.VTE_transformer_tester_model(
-            img_shape=self.img_shape,
+        self.tester_model = CVAE_modules.cvae_tester_wrapper(
+            conditioning_input_shapes=self.conditioning_input_shapes,
+            conditioning_input_names=self.conditioning_input_names,
             dec_model=self.transformer_model,
             latent_shape=self.transform_latent_shape,
         )
@@ -181,7 +146,7 @@ class CVAE(object):
                     transform_latent_shape=self.transform_latent_shape)
             self.tester_model = self.transformer_model
         '''
-        self.vae_metrics = VAE_metrics(
+        self.vae_metrics = metrics.VAE_metrics(
             var_target=1.,
             mu_target=0.,
             axis=-1)

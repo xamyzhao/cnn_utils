@@ -19,7 +19,7 @@ sys.path.append('../neuron')
 from neuron.layers import SpatialTransformer
 
 sys.path.append('../LPAT')
-import transform_network_utils
+from networks import transform_network_utils
 
 def transform_encoder_model(input_shapes, input_names=None,
                             latent_shape=(50,),
@@ -127,7 +127,7 @@ def transformer_model(conditioning_input_shapes, conditioning_input_names=None,
         conditioning_inputs.append(Input(input_shape, name=conditioning_input_names[ii]))
 
     conditioning_input_stack = Concatenate(name='concat_cond_inputs', axis=-1)(conditioning_inputs)
-    conditioning_input_shape = conditioning_input_stack.get_shape().as_list()[1:]
+    conditioning_input_shape = tuple(conditioning_input_stack.get_shape().as_list()[1:])
 
     n_dims = len(conditioning_input_shape) - 1
     if output_shape is None:
@@ -135,7 +135,6 @@ def transformer_model(conditioning_input_shapes, conditioning_input_names=None,
 
     # we will always give z as a flattened vector
     z_input = Input((np.prod(transform_latent_shape),), name='z_input')
-
 
     # determine what we should apply the transformation to
     if source_input_idx is None:
@@ -252,15 +251,22 @@ def transformer_model(conditioning_input_shapes, conditioning_input_names=None,
             transform_activation,
             name='activation_transform_{}'.format(transform_activation))(x_transformation)
 
-        if transform_type == 'color' and 'B_' in color_transform_type and transform_activation=='tanh':
+        if transform_type == 'color' and 'delta' in color_transform_type and transform_activation=='tanh':
             # TODO: maybe move this logic
             # if we are learning a colro delta with a tanh, make sure to multiply it by 2
             x_transformation = Lambda(lambda x: x * 2, name='lambda_scale_tanh')(x_transformation)
 
     if mask_by_conditioning_input_idx is not None:
         x_transformation = Multiply(name='mult_mask_transformation')([x_transformation, x_mask])
-
-    im_out, transform_out = apply_transformation(x_source, x_transformation)
+    if transform_type is not None:
+        im_out, transform_out = apply_transformation(x_source, x_transformation, 
+            output_shape=source_input_shape, conditioning_input_shape=conditioning_input_shape, transform_name=transform_type,
+            apply_flow_transform=transform_type=='flow',
+            apply_color_transform=transform_type=='color',
+            color_transform_type=color_transform_type
+            )
+    else:
+        im_out = x_transformation
 
     if clip_output_range is not None:
         im_out = Lambda(lambda x: tf.clip_by_value(x, clip_output_range[0], clip_output_range[1]),
@@ -300,7 +306,7 @@ def apply_transformation(x_source, x_transformation,
             x_color_out = Multiply()([x_source, x_transformation])
         else:
             raise NotImplementedError('Only color transform types delta and mult are supported!')
-
+        print(output_shape)
         im_out = Reshape(output_shape, name='color_transformer')(x_color_out)
     else:
         im_out = x_transformation
@@ -340,12 +346,12 @@ def cvae_trainer_wrapper(
         # ae_stack = SpatialTransformer(name='st_affine_stack')([ae_stack, T_in])
         # cond_stack = SpatialTransformer(name='st_affine_img')([cond_stack, T_in])
         ae_inputs = [
-            SpatialTransformer(name='st_affine_{}'.format(ae_input_names[ii]))(ae_input)
+            SpatialTransformer(name='st_affine_{}'.format(ae_input_names[ii]))([ae_input, T_in])
             for ii, ae_input in enumerate(ae_inputs)
         ]
 
         conditioning_inputs = [
-            SpatialTransformer(name='st_affine_{}'.format(conditioning_input_names[ii]))(cond_input)
+            SpatialTransformer(name='st_affine_{}'.format(conditioning_input_names[ii]))([cond_input, T_in])
             for ii, cond_input in enumerate(conditioning_inputs)
         ]
     # encode x_stacked into z
@@ -374,9 +380,9 @@ def cvae_trainer_wrapper(
         im_out = decoder_out
 
     if transform_type is not None:
-        return Model(inputs=inputs, outputs=[im_out, transform_out, z_mean, z_logvar], name=model_name)
+        return Model(inputs=inputs, outputs=[im_out] * n_outputs + [transform_out, z_mean, z_logvar], name=model_name)
     else:
-        return Model(inputs=inputs, outputs=[im_out, z_mean, z_logvar], name=model_name)
+        return Model(inputs=inputs, outputs=[im_out] * n_outputs + [z_mean, z_logvar], name=model_name)
 
 
 def cvae_tester_wrapper(
@@ -402,7 +408,7 @@ def cvae_tester_wrapper(
     z_samp = Lambda(transform_network_utils.sampling_sigma1,
                         name='lambda_z_sampling_stdnormal'
                         )(z_dummy_input)
-    y = dec_model([cond_stack, z_samp])
+    y = dec_model(conditioning_inputs + [z_samp])
     return Model(inputs=conditioning_inputs + [z_dummy_input], outputs=y, name='cvae_tester_model')
 
 
