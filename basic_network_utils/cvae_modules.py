@@ -130,8 +130,6 @@ def transformer_model(conditioning_input_shapes, conditioning_input_names=None,
     conditioning_input_shape = tuple(conditioning_input_stack.get_shape().as_list()[1:])
 
     n_dims = len(conditioning_input_shape) - 1
-    if output_shape is None:
-        output_shape = conditioning_input_shape
 
     # we will always give z as a flattened vector
     z_input = Input((np.prod(transform_latent_shape),), name='z_input')

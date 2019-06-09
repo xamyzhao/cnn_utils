@@ -1,4 +1,4 @@
-from basic_network_utils import CVAE_modules
+from basic_network_utils import cvae_modules
 
 import sys
 sys.path.append('../evolving_wilds')
@@ -80,7 +80,7 @@ class CVAE(object):
     def create_modules(self):
         print('Creating CVAE with encoder params {}'.format(self.transform_enc_params))
         self.transform_enc_model = \
-            CVAE_modules.transform_encoder_model(
+            cvae_modules.transform_encoder_model(
                 input_shapes=self.ae_input_shapes,
                 input_names=self.ae_input_names,
                 latent_shape=self.transform_latent_shape,
@@ -88,7 +88,7 @@ class CVAE(object):
                 enc_params=self.transform_enc_params)
 
         self.transformer_model = \
-            CVAE_modules.transformer_model(
+            cvae_modules.transformer_model(
                 conditioning_input_shapes=self.conditioning_input_shapes,
                 conditioning_input_names=self.conditioning_input_names,
                 output_shape=self.output_shape,
@@ -107,7 +107,7 @@ class CVAE(object):
 
     def create_train_wrapper(self, n_samples=1):
         self.trainer_model = \
-            CVAE_modules.cvae_trainer_wrapper(
+            cvae_modules.cvae_trainer_wrapper(
                 ae_input_shapes=self.ae_input_shapes,
                 ae_input_names=self.ae_input_names,
                 conditioning_input_shapes=self.conditioning_input_shapes,
@@ -123,7 +123,7 @@ class CVAE(object):
             )
 
         # TODO: include the conditional encoder if we have an AVAE
-        self.tester_model = CVAE_modules.cvae_tester_wrapper(
+        self.tester_model = cvae_modules.cvae_tester_wrapper(
             conditioning_input_shapes=self.conditioning_input_shapes,
             conditioning_input_names=self.conditioning_input_names,
             dec_model=self.transformer_model,
