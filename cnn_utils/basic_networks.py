@@ -361,14 +361,14 @@ def decoder(x,
     else:
         print('Target concat vols to match shapes to: {}'.format(target_vol_sizes))
         # fill in any Nones that we might have in our target_vol_sizes
-        filled_target_vol_sizes = default_target_vol_sizes[:]
+        filled_target_vol_sizes = [None] * len(default_target_vol_sizes)
         for i in range(n_convs - 1):
             if i < len(target_vol_sizes) and target_vol_sizes[i] is not None:
                 filled_target_vol_sizes[i] = target_vol_sizes[i]
         target_vol_sizes = filled_target_vol_sizes
 
     if include_skips is not None:
-        print('Concatentating with skips {}'.format([s for s in include_skips if s is not None]))
+        print('Concatentating padded/cropped shapes {} with skips {}'.format(target_vol_sizes, include_skips))
 
     curr_shape = np.asarray(encoded_shape[:n_dims])
     for i in range(n_convs):
