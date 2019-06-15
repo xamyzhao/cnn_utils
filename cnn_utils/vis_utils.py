@@ -188,11 +188,11 @@ def label_ims(ims_batch, labels=None,
                 else:
                     formatted_text = '{}'.format(labels[i])
 
-                font = ImageFont.truetype('Ubuntu-M.ttf', font_size)
-                # wrap the text so it fits
-                formatted_text = textwrap.wrap(formatted_text, width=max_text_width)
-
                 if display_h > 30:  # only print label if we have room
+                    font = ImageFont.truetype('Ubuntu-M.ttf', font_size)
+                    # wrap the text so it fits
+                    formatted_text = textwrap.wrap(formatted_text, width=max_text_width)
+
                     for li, line in enumerate(formatted_text):
                         if concat_axis == 0:
                             draw.text((5, i * im_h + 5 + 14 * li), line, font=font, fill=(50, 50, 255))

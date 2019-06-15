@@ -194,8 +194,11 @@ def transformer_model(conditioning_input_shapes, conditioning_input_names=None,
 
         print('Including downsampled input sizes {}'.format([x.get_shape().as_list() for x in xs_downscaled]))
 
-        concat_decoder_outputs_with[:len(xs_downscaled)] = list(reversed(xs_downscaled))
-        concat_skip_sizes[:len(xs_downscaled)] = list(reversed(
+        # the smallest decoder volume will be the same as the smallest encoder volume, so we need to make sure we match volume sizes appropriately
+        n_enc_scales = len(enc_params['nf_enc'])
+        n_ds = len(xs_downscaled)
+        concat_decoder_outputs_with[n_enc_scales - n_ds + 1:n_enc_scales] = list(reversed(xs_downscaled))
+        concat_skip_sizes[n_enc_scales - n_ds + 1:n_enc_scales] = list(reversed(
             [np.asarray(x.get_shape().as_list()[1:-1]) for x in xs_downscaled if
              x is not None]))
 
@@ -215,13 +218,15 @@ def transformer_model(conditioning_input_shapes, conditioning_input_names=None,
             conv_chans=enc_params['nf_enc'],
         )
 
+        # doesnt make sense to compare these if we're not concatenating the smallest decoder volume with anything
+        '''
         if np.all(reshape_encoding_to[:n_dims] > concat_skip_sizes[-1][:n_dims]):
             raise RuntimeWarning(
                 'Attempting to concatenate reshaped latent vector of shape {} with downsampled input of shape {}!'.format(
                     reshape_encoding_to,
                     concat_skip_sizes[-1]
                 ))
-
+        ''' 
         x_enc = Dense(np.prod(reshape_encoding_to))(z_input)
     else:
         # latent representation is already in correct shape
