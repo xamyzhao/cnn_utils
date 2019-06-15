@@ -204,7 +204,7 @@ def label_ims(ims_batch, labels=None,
     return out_im
 
 def concatenate_with_pad(ims_list, pad_to_im_idx=None, axis=None, pad_val=0.):
-    padded_ims_list = pad_images_to_size(ims_list, pad_to_im_idx, ignore_axes=axis)
+    padded_ims_list = pad_images_to_size(ims_list, pad_to_im_idx, ignore_axes=axis, pad_val=pad_val)
     return np.concatenate(padded_ims_list, axis=axis)
 
 def pad_images_to_size(ims_list, pad_to_im_idx=None, ignore_axes=None, pad_val=0.):
