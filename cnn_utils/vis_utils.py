@@ -6,7 +6,7 @@ import numpy as np
 import cv2
 
 import textwrap
-from cnn_utils import image_utils
+from cnn_utils import image_utils, classification_utils
 import PIL
 from PIL import Image, ImageDraw, ImageFont
 import matplotlib as mpl
@@ -92,8 +92,20 @@ def label_ims(ims_batch, labels=None,
             for c in range(len(min_flow)):
                 labels[i] += '({}, {})'.format(round(min_flow[c], 1), round(max_flow[c], 1))
         ims_batch = X_fullcolor.copy()
+    elif ims_batch.shape[-1] > 3:
+        # not an image, probably labels
 
-    elif inverse_normalize:
+        n_labels = ims_batch.shape[-1]
+        cmap = make_cmap_rainbow(n_labels)
+
+        labels_im = classification_utils.onehot_to_labels(ims_batch, n_classes=ims_batch.shape[-1])
+        labels_im_flat = labels_im.reshape((-1, 1))
+        labeled_im_flat = np.tile(labels_im_flat, (1, 3))
+        for l in range(n_labels):
+            labeled_im_flat[labels_im_flat == l] = cmap[l]
+        ims_batch = labeled_im_flat.reshape((-1,) + ims_batch.shape[1:-1] + (3,))
+
+    elif ims_batch.shape[-1] == 3 and inverse_normalize:
         ims_batch = image_utils.inverse_normalize(ims_batch)
 
     elif normalize:

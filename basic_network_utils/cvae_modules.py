@@ -102,19 +102,19 @@ def transform_encoder_model(input_shapes, input_names=None,
     return Model(inputs=inputs, outputs=[z_mean, z_logvar], name=model_name)
 
 
-def transformer_model(conditioning_input_shapes, conditioning_input_names=None,
-                      output_shape=None,
-                      model_name='CVAE_transformer',
-                      transform_latent_shape=(100,),
-                      transform_type=None,
-                      color_transform_type=None,
-                      enc_params=None,
-                      condition_on_image=True,
-                      n_concat_scales=3,
-                      transform_activation=None, clip_output_range=None,
-                      source_input_idx=None,
-                      mask_by_conditioning_input_idx=None,
-                      ):
+def transformer_concat_model(conditioning_input_shapes, conditioning_input_names=None,
+                             output_shape=None,
+                             model_name='CVAE_transformer',
+                             transform_latent_shape=(100,),
+                             transform_type=None,
+                             color_transform_type=None,
+                             enc_params=None,
+                             condition_on_image=True,
+                             n_concat_scales=3,
+                             transform_activation=None, clip_output_range=None,
+                             source_input_idx=None,
+                             mask_by_conditioning_input_idx=None,
+                             ):
 
     # collect conditioning inputs, and concatentate them into a stack
     if not isinstance(conditioning_input_shapes, list):
@@ -226,7 +226,7 @@ def transformer_model(conditioning_input_shapes, conditioning_input_names=None,
                     reshape_encoding_to,
                     concat_skip_sizes[-1]
                 ))
-        ''' 
+        '''
         x_enc = Dense(np.prod(reshape_encoding_to))(z_input)
     else:
         # latent representation is already in correct shape
@@ -262,7 +262,7 @@ def transformer_model(conditioning_input_shapes, conditioning_input_names=None,
     if mask_by_conditioning_input_idx is not None:
         x_transformation = Multiply(name='mult_mask_transformation')([x_transformation, x_mask])
     if transform_type is not None:
-        im_out, transform_out = apply_transformation(x_source, x_transformation, 
+        im_out, transform_out = apply_transformation(x_source, x_transformation,
             output_shape=source_input_shape, conditioning_input_shape=conditioning_input_shape, transform_name=transform_type,
             apply_flow_transform=transform_type=='flow',
             apply_color_transform=transform_type=='color',
@@ -279,6 +279,58 @@ def transformer_model(conditioning_input_shapes, conditioning_input_names=None,
         return Model(inputs=conditioning_inputs + [z_input], outputs=[im_out, transform_out], name=model_name)
     else:
         return Model(inputs=conditioning_inputs + [z_input], outputs=[im_out], name=model_name)
+
+def transformer_selector_model(conditioning_input_shapes, segmenter_input_idx, conditioning_input_names=None,
+                             output_shape=None,
+                             model_name='CVAE_transformer',
+                             transform_latent_shape=(100,),
+                             transform_type=None,
+                             color_transform_type=None,
+                             enc_params=None,
+                             condition_on_image=True,
+                             n_concat_scales=3,
+                             transform_activation=None, clip_output_range=None,
+                             source_input_idx=None,
+                             mask_by_conditioning_input_idx=None,
+                             ):
+
+    # collect conditioning inputs, and concatentate them into a stack
+    if not isinstance(conditioning_input_shapes, list):
+        conditioning_input_shapes = [conditioning_input_shapes]
+    if conditioning_input_names is None:
+        conditioning_input_names = ['cond_input_{}'.format(ii) for ii in range(len(conditioning_input_shapes))]
+
+    conditioning_inputs = []
+    for ii, input_shape in enumerate(conditioning_input_shapes):
+        conditioning_inputs.append(Input(input_shape, name=conditioning_input_names[ii]))
+
+    conditioning_input_stack = Concatenate(name='concat_cond_inputs', axis=-1)(conditioning_inputs)
+    conditioning_input_shape = tuple(conditioning_input_stack.get_shape().as_list()[1:])
+
+    n_dims = len(conditioning_input_shape) - 1
+
+    n_segs = 256
+
+    segs = basic_networks.unet2D(
+        conditioning_inputs[segmenter_input_idx],
+        input_shape=conditioning_input_shapes[segmenter_input_idx],
+        out_im_chans=n_segs,
+        **enc_params
+    )
+    segs = Activation('softmax', name='softmax_segs')(segs)
+
+    # we will always give z as a flattened vector
+    z_input = Input((np.prod(transform_latent_shape),), name='z_input')
+    z = Dense(n_segs / 2, name='dense_z_1')(z_input)
+    z = LeakyReLU(0.2)(z)
+    z = Dense(n_segs, name='dense_z_2')(z)
+    z = LeakyReLU(0.2)(z)
+    z = Activation('softmax', name='softmax_z')(z)
+    z = Reshape((1, 1, n_segs), name='reshape_z')(z)
+
+    out_map = Multiply(name='mult_segs_z')([segs, z])
+
+    return Model(inputs=conditioning_inputs + [z_input], outputs=[out_map], name=model_name)
 
 
 # applies a decoder to x_enc and then applies the transform to I
@@ -387,6 +439,108 @@ def cvae_trainer_wrapper(
     else:
         return Model(inputs=inputs, outputs=[im_out] * n_outputs + [z_mean, z_logvar], name=model_name)
 
+def cvae_learned_prior_trainer_wrapper(
+        ae_input_shapes, ae_input_names,
+        conditioning_input_shapes, conditioning_input_names,
+        output_shape=None,
+        model_name='transformer_trainer',
+        transform_encoder_model=None, transformer_model=None, prior_encoder_model=None,
+        transform_type='flow',
+        transform_latent_shape=(50,),
+        include_aug_matrix=False,
+        n_outputs=1,
+):
+    '''''''''''''''''''''
+    VTE transformer train model
+        - takes I, I+J as input
+        - encodes I+J to z
+        - condition_on_image = True means that the transform is decoded from the transform+image embedding,
+                otherwise it is decoded from only the transform embedding
+        - decodes latent embedding into transform and applies it
+    '''''''''''''''''''''
+    ae_inputs, ae_stack, conditioning_inputs, cond_stack = _collect_inputs(
+        ae_input_shapes, ae_input_names,
+        conditioning_input_shapes, conditioning_input_names)
+    conditioning_input_shape = cond_stack.get_shape().as_list()[1:]
+
+    inputs = ae_inputs + conditioning_inputs
+
+    if include_aug_matrix:
+        T_in = Input((3, 3), name='transform_input')
+        inputs += [T_in]
+        # ae_stack = SpatialTransformer(name='st_affine_stack')([ae_stack, T_in])
+        # cond_stack = SpatialTransformer(name='st_affine_img')([cond_stack, T_in])
+        ae_inputs = [
+            SpatialTransformer(name='st_affine_{}'.format(ae_input_names[ii]))([ae_input, T_in])
+            for ii, ae_input in enumerate(ae_inputs)
+        ]
+
+        conditioning_inputs = [
+            SpatialTransformer(name='st_affine_{}'.format(conditioning_input_names[ii]))([cond_input, T_in])
+            for ii, cond_input in enumerate(conditioning_inputs)
+        ]
+
+    z_mean_prior, z_logvar_prior = prior_encoder_model(conditioning_inputs)
+    z_mean_prior = Reshape(transform_latent_shape, name='latent_mean_prior')(z_mean_prior)
+    z_logvar_prior = Reshape(transform_latent_shape, name='latent_logvar_prior')(z_logvar_prior)
+
+    # encode x_stacked into z
+    z_mean, z_logvar = transform_encoder_model(ae_inputs)
+
+    z_mean = Reshape(transform_latent_shape, name='latent_mean')(z_mean)
+    z_logvar = Reshape(transform_latent_shape, name='latent_logvar')(z_logvar)
+
+    z_sampled = Lambda(transform_network_utils.sampling, output_shape=transform_latent_shape, name='lambda_sampling')(
+        [z_mean, z_logvar])
+
+    decoder_out = transformer_model(conditioning_inputs + [z_sampled])
+
+    if transform_type == 'flow':
+        im_out, transform_out = decoder_out
+        transform_shape = transform_out.get_shape().as_list()[1:]
+
+        transform_out = Reshape(transform_shape, name='decoder_flow_out')(transform_out)
+        im_out = Reshape(output_shape, name='spatial_transformer')(im_out)
+    elif transform_type == 'color':
+        im_out, transform_out = decoder_out
+
+        transform_out = Reshape(output_shape, name='decoder_color_out')(transform_out)
+        im_out = Reshape(output_shape, name='color_transformer')(im_out)
+    else:
+        im_out = decoder_out
+
+    if transform_type is not None:
+        return Model(inputs=inputs, outputs=[im_out] * n_outputs + [transform_out, z_mean, z_logvar, z_mean_prior, z_logvar_prior], name=model_name)
+    else:
+        return Model(inputs=inputs, outputs=[im_out] * n_outputs + [z_mean, z_logvar, z_mean_prior, z_logvar_prior], name=model_name)
+
+
+def cvae_learned_prior_tester_wrapper(
+        conditioning_input_shapes, conditioning_input_names,
+        prior_enc_model,
+        dec_model,
+
+):
+    # collect conditioning inputs, and concatentate them into a stack
+    if not isinstance(conditioning_input_shapes, list):
+        conditioning_input_shapes = [conditioning_input_shapes]
+    if conditioning_input_names is None:
+        conditioning_input_names = ['cond_input_{}'.format(ii) for ii in range(len(conditioning_input_shapes))]
+
+    conditioning_inputs = []
+    for ii, input_shape in enumerate(conditioning_input_shapes):
+        conditioning_inputs.append(Input(input_shape, name=conditioning_input_names[ii]))
+
+
+    z_mean_prior, z_logvar_prior = prior_enc_model(conditioning_inputs)
+
+    z_samp = Lambda(transform_network_utils.sampling,
+                        name='lambda_z_sampling_prior'
+                        )([z_mean_prior, z_logvar_prior])
+
+    y = dec_model(conditioning_inputs + [z_samp])
+
+    return Model(inputs=conditioning_inputs, outputs=y, name='cvae_tester_model')
 
 def cvae_tester_wrapper(
         conditioning_input_shapes, conditioning_input_names,
@@ -404,7 +558,6 @@ def cvae_tester_wrapper(
     for ii, input_shape in enumerate(conditioning_input_shapes):
         conditioning_inputs.append(Input(input_shape, name=conditioning_input_names[ii]))
 
-    cond_stack = Concatenate(name='concat_cond_inputs', axis=-1)(conditioning_inputs)
 
     z_dummy_input = Input(latent_shape, name='z_input')
 
