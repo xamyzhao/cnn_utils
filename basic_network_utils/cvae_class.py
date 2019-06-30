@@ -218,7 +218,7 @@ class CVAE(object):
 
 
 
-class CVAE_learned_prior(object):
+class CVAE_segment_selector(object):
     def __init__(self,
                  ae_input_shapes,
                  ae_input_names,
@@ -240,7 +240,7 @@ class CVAE_learned_prior(object):
                  include_aug_matrix=False,
                  aug_pad_vals=(1, 1),
                  clip_output_range=None,
-        ):
+                 ):
         self.conditioning_input_shapes = [tuple(s) for s in conditioning_input_shapes]
         self.conditioning_input_names = conditioning_input_names
 
@@ -248,7 +248,7 @@ class CVAE_learned_prior(object):
         self.ae_input_names = ae_input_names
 
         self.output_shape = output_shape
-        self.n_outputs = n_outputs # in case we need to return copies of the transformed image for multiple losses
+        self.n_outputs = n_outputs  # in case we need to return copies of the transformed image for multiple losses
 
         self.source_im_idx = source_im_idx
         self.mask_im_idx = mask_im_idx
@@ -296,7 +296,7 @@ class CVAE_learned_prior(object):
         self.clip_output_range = clip_output_range
 
         # TODO: rename this class to be a segment selector
-        self.n_segs = 256
+        self.n_segs = self.transform_latent_shape[0]
         self.segs_shape = self.conditioning_input_shapes[0][:-1] + (self.n_segs,)
 
     def create_modules(self):
@@ -304,12 +304,11 @@ class CVAE_learned_prior(object):
         if self.latent_distribution == 'normal':
             self.transform_enc_model = \
                 cvae_modules.transform_encoder_model(
-                    input_shapes=self.ae_input_shapes,# + [self.segs_shape],
-                    input_names=self.ae_input_names,# + ['segs'],
+                    input_shapes=self.ae_input_shapes,  # + [self.segs_shape],
+                    input_names=self.ae_input_names,  # + ['segs'],
                     latent_shape=self.transform_latent_shape,
                     model_name='{}_transform_encoder_cvae'.format(self.transform_name),
                     enc_params=self.transform_enc_params)
-
 
             self.prior_enc_model = \
                 cvae_modules.transform_encoder_model(
@@ -351,8 +350,8 @@ class CVAE_learned_prior(object):
                 enc_params=self.dec_params,
                 transform_activation=self.transform_activation,
                 clip_output_range=self.clip_output_range
-        )
-    
+            )
+
         from keras.models import Model
         from keras.layers import Input, Activation
         seg_input = Input(self.conditioning_input_shapes[0], name='input_frame')
@@ -366,7 +365,6 @@ class CVAE_learned_prior(object):
         )
         segs = Activation('softmax', name='softmax_segs')(segs)
         self.seg_model = Model(inputs=seg_input, outputs=segs, name='seg_model')
-
 
     def create_train_wrapper(self, n_samples=1):
         self.trainer_model = \
@@ -432,7 +430,8 @@ class CVAE_learned_prior(object):
                 '{}_kl_mu'.format(self.transform_type), '{}_kl_logvar'.format(self.transform_type),
                 'dummy_mu', 'dummy_logvar'
             ]
-            loss_fns = [self.vae_metrics.kl_mu, self.vae_metrics.kl_log_sigma, 'mean_absolute_error', 'mean_absolute_error']
+            loss_fns = [self.vae_metrics.kl_mu, self.vae_metrics.kl_log_sigma, 'mean_absolute_error',
+                        'mean_absolute_error']
             loss_weights = [1.] * 2 + [0.] * 2
         elif self.latent_distribution == 'categorical':
             # KL losses
@@ -465,10 +464,10 @@ class CVAE_learned_prior(object):
         if self.transform_type is not None:
             # reconstruction first since this is what we care about. then smoothness
             loss_names += [
-                '{}_recon_{}'.format(self.transform_name, rln) for rln in recon_loss_name
-            ] + [
-                '{}_smooth_{}'.format(self.transform_name, transform_reg_name),
-            ]
+                              '{}_recon_{}'.format(self.transform_name, rln) for rln in recon_loss_name
+                          ] + [
+                              '{}_smooth_{}'.format(self.transform_name, transform_reg_name),
+                          ]
             loss_fns += recon_loss_fn + [transform_reg_fn]  # smoothness reg, reconstruction
             loss_weights += recon_loss_weight + [transform_reg_lambda]
         else:  # no transform, just direct synthesis
