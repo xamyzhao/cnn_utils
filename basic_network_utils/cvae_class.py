@@ -225,6 +225,7 @@ class CVAE_learned_prior(object):
                  conditioning_input_shapes,
                  conditioning_input_names,
                  output_shape,
+                 latent_distribution='normal',
                  source_im_idx=None,
                  mask_im_idx=None,
                  transform_latent_dim=50,
@@ -251,6 +252,9 @@ class CVAE_learned_prior(object):
 
         self.source_im_idx = source_im_idx
         self.mask_im_idx = mask_im_idx
+
+        # standard normal, or categorical
+        self.latent_distribution = latent_distribution
 
         # correct for outdated spec of nf_enc
         self.transform_enc_params = transform_enc_params.copy()
@@ -297,7 +301,7 @@ class CVAE_learned_prior(object):
 
     def create_modules(self):
         print('Creating CVAE with encoder params {}'.format(self.transform_enc_params))
-        if self.ae_input_shapes is not None:
+        if self.latent_distribution == 'normal':
             self.transform_enc_model = \
                 cvae_modules.transform_encoder_model(
                     input_shapes=self.ae_input_shapes,# + [self.segs_shape],
@@ -306,13 +310,29 @@ class CVAE_learned_prior(object):
                     model_name='{}_transform_encoder_cvae'.format(self.transform_name),
                     enc_params=self.transform_enc_params)
 
-        self.prior_enc_model = \
-            cvae_modules.transform_encoder_model(
-                input_shapes=self.conditioning_input_shapes + [self.segs_shape],
-                input_names=self.conditioning_input_names + ['segs'],
+
+            self.prior_enc_model = \
+                cvae_modules.transform_encoder_model(
+                    input_shapes=self.conditioning_input_shapes + [self.segs_shape],
+                    input_names=self.conditioning_input_names + ['segs'],
+                    latent_shape=self.transform_latent_shape,
+                    model_name='prior_encoder_cvae'.format(self.transform_name),
+                    enc_params=self.transform_enc_params)
+        else:
+            self.transform_enc_model = cvae_modules.transform_categorical_encoder_model(
+                input_shapes=self.ae_input_shapes,  # + [self.segs_shape],
+                input_names=self.ae_input_names,  # + ['segs'],
                 latent_shape=self.transform_latent_shape,
-                model_name='prior_encoder_cvae'.format(self.transform_name),
+                model_name='{}_transform_encoder_cvae'.format(self.transform_name),
                 enc_params=self.transform_enc_params)
+
+            self.prior_enc_model = \
+                cvae_modules.transform_categorical_encoder_model(
+                    input_shapes=self.conditioning_input_shapes + [self.segs_shape],
+                    input_names=self.conditioning_input_names + ['segs'],
+                    latent_shape=self.transform_latent_shape,
+                    model_name='prior_encoder_cvae'.format(self.transform_name),
+                    enc_params=self.transform_enc_params)
 
         # TODO: right now we only support segment_selector
         self.transformer_model = \
@@ -357,6 +377,7 @@ class CVAE_learned_prior(object):
                 conditioning_input_names=self.conditioning_input_names,
                 output_shape=self.output_shape,
                 model_name='{}_transformer_cvae_trainer'.format(self.transform_name),
+                latent_distribution=self.latent_distribution,
                 seg_model=self.seg_model,
                 transform_encoder_model=self.transform_enc_model,
                 prior_encoder_model=self.prior_enc_model,
@@ -371,6 +392,7 @@ class CVAE_learned_prior(object):
         self.tester_model = cvae_modules.cvae_learned_prior_tester_wrapper(
             conditioning_input_shapes=self.conditioning_input_shapes,
             conditioning_input_names=self.conditioning_input_names,
+            latent_distribution=self.latent_distribution,
             seg_model=self.seg_model,
             prior_enc_model=self.prior_enc_model,
             dec_model=self.transformer_model,
@@ -392,22 +414,37 @@ class CVAE_learned_prior(object):
                     transform_latent_shape=self.transform_latent_shape)
             self.tester_model = self.transformer_model
         '''
-        self.vae_metrics = metrics.VAE_metrics(
-            logvar_target=self.trainer_model.get_layer('latent_logvar_prior').output,
-            mu_target=self.trainer_model.get_layer('latent_mean_prior').output,
-            axis=-1)
+        if self.latent_distribution == 'normal':
+            self.vae_metrics = metrics.VAE_metrics(
+                logvar_target=self.trainer_model.get_layer('latent_logvar_prior').output,
+                mu_target=self.trainer_model.get_layer('latent_mean_prior').output,
+                axis=-1)
+        elif self.latent_distribution == 'categorical':
+            self.vae_metrics = metrics.VAE_metrics_categorical(n_categories=self.transform_latent_shape[0])
 
     def get_models(self):
         return [self.transform_enc_model, self.transformer_model, self.prior_enc_model, self.seg_model]
 
     def _get_kl_losses(self):
-        # KL losses
-        loss_names = [
-            '{}_kl_mu'.format(self.transform_type), '{}_kl_logvar'.format(self.transform_type),
-            'dummy_mu', 'dummy_logvar'
-        ]
-        loss_fns = [self.vae_metrics.kl_mu, self.vae_metrics.kl_log_sigma, 'mean_squared_error', 'mean_squared_error']
-        loss_weights = [1.] * 2 + [0.] * 2
+        if self.latent_distribution == 'normal':
+            # KL losses
+            loss_names = [
+                '{}_kl_mu'.format(self.transform_type), '{}_kl_logvar'.format(self.transform_type),
+                'dummy_mu', 'dummy_logvar'
+            ]
+            loss_fns = [self.vae_metrics.kl_mu, self.vae_metrics.kl_log_sigma, 'mean_absolute_error', 'mean_absolute_error']
+            loss_weights = [1.] * 2 + [0.] * 2
+        elif self.latent_distribution == 'categorical':
+            # KL losses
+            loss_names = [
+                '{}_kl_categorical'.format(self.transform_type),
+                'dummy_prior_categorical'
+            ]
+            loss_fns = [self.vae_metrics.kl_categorical, 'mean_absolute_error']
+            loss_weights = [1., 0]
+        else:
+            raise NotImplementedError('Only normal and categorical distributions are supported!')
+
         return loss_names, loss_fns, loss_weights
 
     def get_losses(self,

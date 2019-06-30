@@ -130,6 +130,66 @@ def transform_encoder_model(input_shapes, input_names=None,
 
     return Model(inputs=inputs, outputs=[z_mean, z_logvar], name=model_name)
 
+def transform_categorical_encoder_model(input_shapes, input_names=None,
+                            latent_shape=(50,),
+                            model_name='VTE_transform_encoder',
+                            enc_params=None,
+                            ):
+    '''
+    Generic encoder for a stack of inputs
+
+    :param input_shape:
+    :param latent_shape:
+    :param model_name:
+    :param enc_params:
+    :return:
+    '''
+    if not isinstance(input_shapes, list):
+        input_shapes = [input_shapes]
+
+    if input_names is None:
+        input_names = ['input_{}'.format(ii) for ii in range(len(input_shapes))]
+
+    inputs = []
+    for ii, input_shape in enumerate(input_shapes):
+        inputs.append(Input(input_shape, name='input_{}'.format(input_names[ii])))
+
+    inputs_stacked = Concatenate(name='concat_inputs', axis=-1)(inputs)
+    input_stack_shape = inputs_stacked.get_shape().as_list()[1:]
+    n_dims = len(input_stack_shape) - 1
+
+    x_transform_enc = basic_networks.encoder(
+        x=inputs_stacked,
+        img_shape=input_stack_shape,
+        conv_chans=enc_params['nf_enc'],
+        min_h=None, min_c=None,
+        n_convs_per_stage=enc_params['n_convs_per_stage'],
+        use_residuals=enc_params['use_residuals'],
+        use_maxpool=enc_params['use_maxpool'],
+        prefix='vte'
+    )
+
+    latent_size = np.prod(latent_shape)
+
+    if not enc_params['fully_conv']:
+        # the last layer in the basic encoder will be a convolution, so we should activate after it
+        x_transform_enc = LeakyReLU(0.2)(x_transform_enc)
+        x_transform_enc = Flatten()(x_transform_enc)
+
+        z_categorical = Dense(latent_size, name='latent_categorical')(x_transform_enc)
+
+        #tau = 0.5
+        #z = Lambda(lambda x:gumbel_softmax(x, tau, hard=False))(z)
+
+        # z_mean = Dense(latent_size, name='latent_mean',
+        #     kernel_initializer=keras_init.RandomNormal(mean=0., stddev=0.00001))(x_transform_enc)
+        # z_logvar = Dense(latent_size, name='latent_logvar',
+        #                 bias_initializer=keras_init.RandomNormal(mean=-2., stddev=1e-10),
+        #                 kernel_initializer=keras_init.RandomNormal(mean=0., stddev=1e-10),
+        #             )(x_transform_enc)
+
+
+    return Model(inputs=inputs, outputs=[z_categorical], name=model_name)
 
 def transformer_concat_model(conditioning_input_shapes, conditioning_input_names=None,
                              output_shape=None,
@@ -314,6 +374,7 @@ def transformer_selector_model(conditioning_input_shapes, conditioning_input_nam
                              output_shape=None,
                              model_name='CVAE_transformer',
                              transform_latent_shape=(100,),
+                               n_segs=64,
                              transform_type=None,
                              color_transform_type=None,
                              enc_params=None,
@@ -340,15 +401,14 @@ def transformer_selector_model(conditioning_input_shapes, conditioning_input_nam
     n_dims = len(conditioning_input_shape) - 1
 
     segs = conditioning_inputs[-1]
-    n_segs = 256
 
     # we will always give z as a flattened vector
     z_input = Input((np.prod(transform_latent_shape),), name='z_input')
-    z = Dense(int(n_segs / 2), name='dense_z_1')(z_input)
-    z = LeakyReLU(0.2)(z)
-    z = Dense(n_segs, name='dense_z_2')(z)
-    z = LeakyReLU(0.2)(z)
-    z = Activation('softmax', name='softmax_z')(z)
+    # z = Dense(int(n_segs / 2), name='dense_z_1')(z_input)
+    # z = LeakyReLU(0.2)(z)
+    # z = Dense(n_segs, name='dense_z_2')(z)
+    # z = LeakyReLU(0.2)(z)
+    z = Activation('softmax', name='softmax_z')(z_input)
     z = Reshape((1, 1, n_segs), name='reshape_z')(z)
 
     out_map = Multiply(name='mult_segs_z')([segs, z])
@@ -465,6 +525,7 @@ def cvae_trainer_wrapper(
 def cvae_learned_prior_trainer_wrapper(
         ae_input_shapes, ae_input_names,
         conditioning_input_shapes, conditioning_input_names,
+        latent_distribution='normal',
         output_shape=None,
         model_name='transformer_trainer',
         seg_model=None,
@@ -506,19 +567,31 @@ def cvae_learned_prior_trainer_wrapper(
 
     segs = seg_model(conditioning_inputs[0])
 
-    z_mean_prior, z_logvar_prior = prior_encoder_model(conditioning_inputs + [segs])
-    z_mean_prior = Reshape(transform_latent_shape, name='latent_mean_prior')(z_mean_prior)
-    z_logvar_prior = Reshape(transform_latent_shape, name='latent_logvar_prior')(z_logvar_prior)
+    if latent_distribution == 'normal':
+        z_mean_prior, z_logvar_prior = prior_encoder_model(conditioning_inputs + [segs])
+        z_mean_prior = Reshape(transform_latent_shape, name='latent_mean_prior')(z_mean_prior)
+        z_logvar_prior = Reshape(transform_latent_shape, name='latent_logvar_prior')(z_logvar_prior)
 
-    # encode x_stacked into z
-    z_mean, z_logvar = transform_encoder_model(ae_inputs)# + [segs])
+        # encode x_stacked into z
+        z_mean, z_logvar = transform_encoder_model(ae_inputs)# + [segs])
 
-    z_mean = Reshape(transform_latent_shape, name='latent_mean')(z_mean)
-    z_logvar = Reshape(transform_latent_shape, name='latent_logvar')(z_logvar)
+        z_mean = Reshape(transform_latent_shape, name='latent_mean')(z_mean)
+        z_logvar = Reshape(transform_latent_shape, name='latent_logvar')(z_logvar)
 
-    z_sampled = Lambda(transform_network_utils.sampling, output_shape=transform_latent_shape, name='lambda_sampling')(
-        [z_mean, z_logvar])
+        z_sampled = Lambda(transform_network_utils.sampling, output_shape=transform_latent_shape, name='lambda_sampling')(
+            [z_mean, z_logvar])
 
+        z_outputs = [z_mean, z_logvar, z_mean_prior, z_logvar_prior]
+    elif latent_distribution == 'categorical':
+        z_prior = prior_encoder_model(conditioning_inputs + [segs])
+        z_post = transform_encoder_model(ae_inputs)
+
+        z_prior = Reshape(transform_latent_shape, name='latent_categorical_prior')(z_prior)
+
+        temperature = 0.5
+        z_sampled = Lambda(lambda x:gumbel_softmax(x, hard=False))(z_post)
+
+        z_outputs = [z_post, z_prior]
     decoder_out = transformer_model(conditioning_inputs + [segs, z_sampled])
 
     if transform_type == 'flow':
@@ -535,17 +608,21 @@ def cvae_learned_prior_trainer_wrapper(
     else:
         im_out = decoder_out
 
+
+
     if transform_type is not None:
-        return Model(inputs=inputs, outputs=[im_out] * n_outputs + [transform_out, z_mean, z_logvar, z_mean_prior, z_logvar_prior], name=model_name)
+        return Model(inputs=inputs, outputs=[im_out] * n_outputs + [transform_out] + z_outputs, name=model_name)
     else:
-        return Model(inputs=inputs, outputs=[im_out] * n_outputs + [z_mean, z_logvar, z_mean_prior, z_logvar_prior], name=model_name)
+        return Model(inputs=inputs, outputs=[im_out] * n_outputs + z_outputs, name=model_name)
 
 
 def cvae_learned_prior_tester_wrapper(
         conditioning_input_shapes, conditioning_input_names,
+
         seg_model,
         prior_enc_model,
         dec_model,
+        latent_distribution='normal'
 
 ):
     # collect conditioning inputs, and concatentate them into a stack
@@ -560,11 +637,18 @@ def cvae_learned_prior_tester_wrapper(
 
     segs = seg_model(conditioning_inputs[0])
 
-    z_mean_prior, z_logvar_prior = prior_enc_model(conditioning_inputs + [segs])
+    if latent_distribution == 'normal':
+        z_mean_prior, z_logvar_prior = prior_enc_model(conditioning_inputs + [segs])
 
-    z_samp = Lambda(transform_network_utils.sampling,
-                        name='lambda_z_sampling_prior'
-                        )([z_mean_prior, z_logvar_prior])
+        z_samp = Lambda(transform_network_utils.sampling,
+                            name='lambda_z_sampling_prior'
+                            )([z_mean_prior, z_logvar_prior])
+    else:
+        z_prior = prior_enc_model(conditioning_inputs + [segs])
+
+        temperature = 0.5
+        z_samp = Lambda(lambda x:gumbel_softmax(x, hard=False))(z_prior)
+
 
     y = dec_model(conditioning_inputs + [segs, z_samp])
 

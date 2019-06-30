@@ -698,6 +698,21 @@ class LearnedSigmaL2(object):
         return  0.5 * tf.divide(K.square(y_pred - y_true) + reg, var_map)
 
 
+class VAE_metrics_categorical(object):
+    """
+    Losses for variational auto-encoders
+    """
+
+    def __init__(self,
+                 n_categories,
+                 axis=1):
+        self.n_categories = n_categories
+        self.axis = axis
+
+    def kl_categorical(self, y_true, y_pred):
+        eps = 1e-8
+        return -y_pred * (tf.log(y_pred + eps) - tf.log(1. / self.n_categories))
+
 class VAE_metrics(object):
     """
     Losses for variational auto-encoders
