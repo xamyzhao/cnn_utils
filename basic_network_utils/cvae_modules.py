@@ -21,6 +21,35 @@ from neuron.layers import SpatialTransformer
 sys.path.append('../LPAT')
 from networks import transform_network_utils
 
+def sample_gumbel(shape, eps=1e-20): 
+    """Sample from Gumbel(0, 1)"""
+    U = tf.random_uniform(shape,minval=0,maxval=1)
+    return -tf.log(-tf.log(U + eps) + eps)
+
+def gumbel_softmax_sample(logits, temperature): 
+    """ Draw a sample from the Gumbel-Softmax distribution"""
+    y = logits + sample_gumbel(tf.shape(logits))
+    return tf.nn.softmax( y / temperature)
+
+def gumbel_softmax(logits, temperature, hard=False):
+    """Sample from the Gumbel-Softmax distribution and optionally discretize.
+    Args:
+        logits: [batch_size, n_class] unnormalized log-probs
+        temperature: non-negative scalar
+        hard: if True, take argmax, but differentiate w.r.t. soft sample y
+    Returns:
+        [batch_size, n_class] sample from the Gumbel-Softmax distribution.
+        If hard=True, then the returned sample will be one-hot, otherwise it will
+        be a probabilitiy distribution that sums to 1 across classes
+    """
+    y = gumbel_softmax_sample(logits, temperature)
+    if hard:
+        k = tf.shape(logits)[-1]
+        #y_hard = tf.cast(tf.one_hot(tf.argmax(y,1),k), y.dtype)
+        y_hard = tf.cast(tf.equal(y,tf.reduce_max(y,1,keep_dims=True)),y.dtype)
+        y = tf.stop_gradient(y_hard - y) + y
+    return y
+
 def transform_encoder_model(input_shapes, input_names=None,
                             latent_shape=(50,),
                             model_name='VTE_transform_encoder',
@@ -280,7 +309,8 @@ def transformer_concat_model(conditioning_input_shapes, conditioning_input_names
     else:
         return Model(inputs=conditioning_inputs + [z_input], outputs=[im_out], name=model_name)
 
-def transformer_selector_model(conditioning_input_shapes, segmenter_input_idx, conditioning_input_names=None,
+
+def transformer_selector_model(conditioning_input_shapes, conditioning_input_names=None,
                              output_shape=None,
                              model_name='CVAE_transformer',
                              transform_latent_shape=(100,),
@@ -309,19 +339,12 @@ def transformer_selector_model(conditioning_input_shapes, segmenter_input_idx, c
 
     n_dims = len(conditioning_input_shape) - 1
 
+    segs = conditioning_inputs[-1]
     n_segs = 256
-
-    segs = basic_networks.unet2D(
-        conditioning_inputs[segmenter_input_idx],
-        input_shape=conditioning_input_shapes[segmenter_input_idx],
-        out_im_chans=n_segs,
-        **enc_params
-    )
-    segs = Activation('softmax', name='softmax_segs')(segs)
 
     # we will always give z as a flattened vector
     z_input = Input((np.prod(transform_latent_shape),), name='z_input')
-    z = Dense(n_segs / 2, name='dense_z_1')(z_input)
+    z = Dense(int(n_segs / 2), name='dense_z_1')(z_input)
     z = LeakyReLU(0.2)(z)
     z = Dense(n_segs, name='dense_z_2')(z)
     z = LeakyReLU(0.2)(z)
@@ -329,7 +352,7 @@ def transformer_selector_model(conditioning_input_shapes, segmenter_input_idx, c
     z = Reshape((1, 1, n_segs), name='reshape_z')(z)
 
     out_map = Multiply(name='mult_segs_z')([segs, z])
-
+    out_map = Lambda(lambda x:tf.reduce_sum(x, axis=-1, keepdims=True), name='lamda_sum_chans')(out_map)
     return Model(inputs=conditioning_inputs + [z_input], outputs=[out_map], name=model_name)
 
 
@@ -444,6 +467,7 @@ def cvae_learned_prior_trainer_wrapper(
         conditioning_input_shapes, conditioning_input_names,
         output_shape=None,
         model_name='transformer_trainer',
+        seg_model=None,
         transform_encoder_model=None, transformer_model=None, prior_encoder_model=None,
         transform_type='flow',
         transform_latent_shape=(50,),
@@ -480,12 +504,14 @@ def cvae_learned_prior_trainer_wrapper(
             for ii, cond_input in enumerate(conditioning_inputs)
         ]
 
-    z_mean_prior, z_logvar_prior = prior_encoder_model(conditioning_inputs)
+    segs = seg_model(conditioning_inputs[0])
+
+    z_mean_prior, z_logvar_prior = prior_encoder_model(conditioning_inputs + [segs])
     z_mean_prior = Reshape(transform_latent_shape, name='latent_mean_prior')(z_mean_prior)
     z_logvar_prior = Reshape(transform_latent_shape, name='latent_logvar_prior')(z_logvar_prior)
 
     # encode x_stacked into z
-    z_mean, z_logvar = transform_encoder_model(ae_inputs)
+    z_mean, z_logvar = transform_encoder_model(ae_inputs)# + [segs])
 
     z_mean = Reshape(transform_latent_shape, name='latent_mean')(z_mean)
     z_logvar = Reshape(transform_latent_shape, name='latent_logvar')(z_logvar)
@@ -493,7 +519,7 @@ def cvae_learned_prior_trainer_wrapper(
     z_sampled = Lambda(transform_network_utils.sampling, output_shape=transform_latent_shape, name='lambda_sampling')(
         [z_mean, z_logvar])
 
-    decoder_out = transformer_model(conditioning_inputs + [z_sampled])
+    decoder_out = transformer_model(conditioning_inputs + [segs, z_sampled])
 
     if transform_type == 'flow':
         im_out, transform_out = decoder_out
@@ -517,6 +543,7 @@ def cvae_learned_prior_trainer_wrapper(
 
 def cvae_learned_prior_tester_wrapper(
         conditioning_input_shapes, conditioning_input_names,
+        seg_model,
         prior_enc_model,
         dec_model,
 
@@ -531,14 +558,15 @@ def cvae_learned_prior_tester_wrapper(
     for ii, input_shape in enumerate(conditioning_input_shapes):
         conditioning_inputs.append(Input(input_shape, name=conditioning_input_names[ii]))
 
+    segs = seg_model(conditioning_inputs[0])
 
-    z_mean_prior, z_logvar_prior = prior_enc_model(conditioning_inputs)
+    z_mean_prior, z_logvar_prior = prior_enc_model(conditioning_inputs + [segs])
 
     z_samp = Lambda(transform_network_utils.sampling,
                         name='lambda_z_sampling_prior'
                         )([z_mean_prior, z_logvar_prior])
 
-    y = dec_model(conditioning_inputs + [z_samp])
+    y = dec_model(conditioning_inputs + [segs, z_samp])
 
     return Model(inputs=conditioning_inputs, outputs=y, name='cvae_tester_model')
 
@@ -571,18 +599,20 @@ def cvae_tester_wrapper(
 def _collect_inputs(ae_input_shapes, ae_input_names,
         conditioning_input_shapes, conditioning_input_names,):
 
-    if not isinstance(ae_input_shapes, list):
-        ae_input_shapes = [ae_input_shapes]
-
-    if ae_input_names is None:
-        ae_input_names = ['input_{}'.format(ii) for ii in range(len(ae_input_names))]
-
     ae_inputs = []
-    for ii, input_shape in enumerate(ae_input_shapes):
-        ae_inputs.append(Input(input_shape, name='input_{}'.format(ae_input_names[ii])))
+    ae_stack = None
+    if ae_input_shapes is not None:
+        if not isinstance(ae_input_shapes, list):
+            ae_input_shapes = [ae_input_shapes]
 
-    ae_stack = Concatenate(name='concat_inputs', axis=-1)(ae_inputs)
-    ae_stack_shape = ae_stack.get_shape().as_list()[1:]
+        if ae_input_names is None:
+            ae_input_names = ['input_{}'.format(ii) for ii in range(len(ae_input_names))]
+
+        for ii, input_shape in enumerate(ae_input_shapes):
+            ae_inputs.append(Input(input_shape, name='input_{}'.format(ae_input_names[ii])))
+
+        ae_stack = Concatenate(name='concat_inputs', axis=-1)(ae_inputs)
+        ae_stack_shape = ae_stack.get_shape().as_list()[1:]
 
     # collect conditioning inputs, and concatentate them into a stack
     if not isinstance(conditioning_input_shapes, list):

@@ -2,7 +2,7 @@ from basic_network_utils import cvae_modules
 
 import sys
 sys.path.append('../evolving_wilds')
-from cnn_utils import metrics
+from cnn_utils import metrics, basic_networks
 
 class CVAE(object):
     def __init__(self,
@@ -291,20 +291,25 @@ class CVAE_learned_prior(object):
         self.transform_activation = transform_activation
         self.clip_output_range = clip_output_range
 
+        # TODO: rename this class to be a segment selector
+        self.n_segs = 256
+        self.segs_shape = self.conditioning_input_shapes[0][:-1] + (self.n_segs,)
+
     def create_modules(self):
         print('Creating CVAE with encoder params {}'.format(self.transform_enc_params))
-        self.transform_enc_model = \
-            cvae_modules.transform_encoder_model(
-                input_shapes=self.ae_input_shapes,
-                input_names=self.ae_input_names,
-                latent_shape=self.transform_latent_shape,
-                model_name='{}_transform_encoder_cvae'.format(self.transform_name),
-                enc_params=self.transform_enc_params)
+        if self.ae_input_shapes is not None:
+            self.transform_enc_model = \
+                cvae_modules.transform_encoder_model(
+                    input_shapes=self.ae_input_shapes,# + [self.segs_shape],
+                    input_names=self.ae_input_names,# + ['segs'],
+                    latent_shape=self.transform_latent_shape,
+                    model_name='{}_transform_encoder_cvae'.format(self.transform_name),
+                    enc_params=self.transform_enc_params)
 
         self.prior_enc_model = \
             cvae_modules.transform_encoder_model(
-                input_shapes=self.conditioning_input_shapes,
-                input_names=self.conditioning_input_names,
+                input_shapes=self.conditioning_input_shapes + [self.segs_shape],
+                input_names=self.conditioning_input_names + ['segs'],
                 latent_shape=self.transform_latent_shape,
                 model_name='prior_encoder_cvae'.format(self.transform_name),
                 enc_params=self.transform_enc_params)
@@ -312,9 +317,8 @@ class CVAE_learned_prior(object):
         # TODO: right now we only support segment_selector
         self.transformer_model = \
             cvae_modules.transformer_selector_model(
-                conditioning_input_shapes=self.conditioning_input_shapes,
-                conditioning_input_names=self.conditioning_input_names,
-                segmenter_input_idx=0,
+                conditioning_input_shapes=self.conditioning_input_shapes + [self.segs_shape],
+                conditioning_input_names=self.conditioning_input_names + ['segs'],
                 output_shape=self.output_shape,
                 source_input_idx=self.source_im_idx,
                 mask_by_conditioning_input_idx=self.mask_im_idx,
@@ -328,6 +332,21 @@ class CVAE_learned_prior(object):
                 transform_activation=self.transform_activation,
                 clip_output_range=self.clip_output_range
         )
+    
+        from keras.models import Model
+        from keras.layers import Input, Activation
+        seg_input = Input(self.conditioning_input_shapes[0], name='input_frame')
+        segs = basic_networks.unet2D(
+            seg_input,
+            input_shape=self.conditioning_input_shapes[0],
+            out_im_chans=self.n_segs,
+            nf_enc=self.transform_enc_params['nf_enc'],
+            nf_dec=self.transform_enc_params['nf_dec'],
+            n_convs_per_stage=self.transform_enc_params['n_convs_per_stage'],
+        )
+        segs = Activation('softmax', name='softmax_segs')(segs)
+        self.seg_model = Model(inputs=seg_input, outputs=segs, name='seg_model')
+
 
     def create_train_wrapper(self, n_samples=1):
         self.trainer_model = \
@@ -338,6 +357,7 @@ class CVAE_learned_prior(object):
                 conditioning_input_names=self.conditioning_input_names,
                 output_shape=self.output_shape,
                 model_name='{}_transformer_cvae_trainer'.format(self.transform_name),
+                seg_model=self.seg_model,
                 transform_encoder_model=self.transform_enc_model,
                 prior_encoder_model=self.prior_enc_model,
                 transformer_model=self.transformer_model,
@@ -351,6 +371,7 @@ class CVAE_learned_prior(object):
         self.tester_model = cvae_modules.cvae_learned_prior_tester_wrapper(
             conditioning_input_shapes=self.conditioning_input_shapes,
             conditioning_input_names=self.conditioning_input_names,
+            seg_model=self.seg_model,
             prior_enc_model=self.prior_enc_model,
             dec_model=self.transformer_model,
         )
@@ -377,7 +398,7 @@ class CVAE_learned_prior(object):
             axis=-1)
 
     def get_models(self):
-        return [self.transform_enc_model, self.transformer_model]
+        return [self.transform_enc_model, self.transformer_model, self.prior_enc_model, self.seg_model]
 
     def _get_kl_losses(self):
         # KL losses

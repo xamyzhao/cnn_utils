@@ -99,10 +99,12 @@ def label_ims(ims_batch, labels=None,
         cmap = make_cmap_rainbow(n_labels)
 
         labels_im = classification_utils.onehot_to_labels(ims_batch, n_classes=ims_batch.shape[-1])
-        labels_im_flat = labels_im.reshape((-1, 1))
-        labeled_im_flat = np.tile(labels_im_flat, (1, 3))
+        labels_im_flat = labels_im.flatten()
+        labeled_im_flat = np.tile(labels_im_flat[..., np.newaxis], (1, 3)).astype(np.float32)
+
+        #for ei in range(batch_size):
         for l in range(n_labels):
-            labeled_im_flat[labels_im_flat == l] = cmap[l]
+            labeled_im_flat[labels_im_flat == l,:] = cmap[l]
         ims_batch = labeled_im_flat.reshape((-1,) + ims_batch.shape[1:-1] + (3,))
 
     elif ims_batch.shape[-1] == 3 and inverse_normalize:
@@ -294,7 +296,6 @@ def make_cmap_rainbow_shuffled(nb_labels=256):
     colors = cv2.cvtColor(np.expand_dims(colors, 0).astype(np.uint8), cv2.COLOR_HSV2RGB).astype(np.float32)[0] / 255.0
     np.random.seed(17)
     color_idxs = np.random.permutation(nb_labels)
-    print(color_idxs)
     colors = colors[color_idxs, :]
     #	print(colors.shape)
     return colors
