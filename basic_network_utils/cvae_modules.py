@@ -176,7 +176,14 @@ def transform_categorical_encoder_model(input_shapes, input_names=None,
         x_transform_enc = LeakyReLU(0.2)(x_transform_enc)
         x_transform_enc = Flatten()(x_transform_enc)
 
-        z_categorical = Dense(latent_size, name='latent_categorical')(x_transform_enc)
+        z = Dense(latent_size, name='dense_1')(x_transform_enc)
+        z = LeakyReLU(0.2)(z)
+        z = Dense(latent_size, name='dense_2')(z)
+        z = LeakyReLU(0.2)(z)
+        z_logits = Dense(latent_size, 
+            bias_initializer=keras_init.RandomNormal(mean=1., stddev=1e-10), 
+            name='dense_latent')(z)  # not yet softmaxed (normalized to [0, 1])
+#        z_categorical = Activation('softmax', name='softmax_latent_categorical')(z)
 
         #tau = 0.5
         #z = Lambda(lambda x:gumbel_softmax(x, tau, hard=False))(z)
@@ -189,7 +196,7 @@ def transform_categorical_encoder_model(input_shapes, input_names=None,
         #             )(x_transform_enc)
 
 
-    return Model(inputs=inputs, outputs=[z_categorical], name=model_name)
+    return Model(inputs=inputs, outputs=[z_logits], name=model_name)
 
 def transformer_concat_model(conditioning_input_shapes, conditioning_input_names=None,
                              output_shape=None,
@@ -375,6 +382,7 @@ def transformer_selector_model(conditioning_input_shapes, conditioning_input_nam
                              model_name='CVAE_transformer',
                              transform_latent_shape=(100,),
                                n_segs=64,
+                             latent_distribution='normal',
                              transform_type=None,
                              color_transform_type=None,
                              enc_params=None,
@@ -402,14 +410,22 @@ def transformer_selector_model(conditioning_input_shapes, conditioning_input_nam
 
     segs = conditioning_inputs[-1]
 
-    # we will always give z as a flattened vector
-    z_input = Input((np.prod(transform_latent_shape),), name='z_input')
-    # z = Dense(int(n_segs / 2), name='dense_z_1')(z_input)
-    # z = LeakyReLU(0.2)(z)
-    # z = Dense(n_segs, name='dense_z_2')(z)
-    # z = LeakyReLU(0.2)(z)
-    z = Activation('softmax', name='softmax_z')(z_input)
-    z = Reshape((1, 1, n_segs), name='reshape_z')(z)
+    if latent_distribution == 'normal':
+        # we will always give z as a flattened vector
+        z_input = Input((np.prod(transform_latent_shape),), name='z_input')
+        z = Dense(int(n_segs / 2), name='dense_z_1')(z_input)
+        z = LeakyReLU(0.2)(z)
+        z = Dense(n_segs, name='dense_z_2')(z)
+        z = LeakyReLU(0.2)(z)
+        z = Reshape((1, 1, n_segs), name='reshape_z')(z)
+    else:
+        # we will always give z as a flattened vector
+        z_input = Input((np.prod(transform_latent_shape),), name='z_input')
+        # z = Dense(int(n_segs / 2), name='dense_z_1')(z_input)
+        # z = LeakyReLU(0.2)(z)
+        # z = Dense(n_segs, name='dense_z_2')(z)
+        # z = LeakyReLU(0.2)(z)
+        z = Reshape((1, 1, n_segs), name='reshape_z')(z_input)
 
     out_map = Multiply(name='mult_segs_z')([segs, z])
     out_map = Lambda(lambda x:tf.reduce_sum(x, axis=-1, keepdims=True), name='lamda_sum_chans')(out_map)
@@ -568,7 +584,7 @@ def cvae_learned_prior_trainer_wrapper(
     segs = seg_model(conditioning_inputs[0])
 
     if latent_distribution == 'normal':
-        z_mean_prior, z_logvar_prior = prior_encoder_model(conditioning_inputs + [segs])
+        z_mean_prior, z_logvar_prior = prior_encoder_model(conditioning_inputs)# + [segs])
         z_mean_prior = Reshape(transform_latent_shape, name='latent_mean_prior')(z_mean_prior)
         z_logvar_prior = Reshape(transform_latent_shape, name='latent_logvar_prior')(z_logvar_prior)
 
@@ -583,13 +599,15 @@ def cvae_learned_prior_trainer_wrapper(
 
         z_outputs = [z_mean, z_logvar, z_mean_prior, z_logvar_prior]
     elif latent_distribution == 'categorical':
-        z_prior = prior_encoder_model(conditioning_inputs + [segs])
+        z_prior = prior_encoder_model(conditioning_inputs)# + [segs])
         z_post = transform_encoder_model(ae_inputs)
 
-        z_prior = Reshape(transform_latent_shape, name='latent_categorical_prior')(z_prior)
+        temperature = 5.
+        z_sampled = Lambda(lambda x:gumbel_softmax(x, temperature=temperature, hard=False), name='lambda_sampling_gumbel')(z_post)
 
-        temperature = 0.5
-        z_sampled = Lambda(lambda x:gumbel_softmax(x, hard=False))(z_post)
+        # actually normalize outputs to a probability, since this is what the KL loss expects
+        z_prior = Activation('softmax', name='latent_categorical_prior')(z_prior)
+        z_post = Activation('softmax', name='latent_categorical')(z_post)
 
         z_outputs = [z_post, z_prior]
     decoder_out = transformer_model(conditioning_inputs + [segs, z_sampled])
@@ -638,16 +656,19 @@ def cvae_learned_prior_tester_wrapper(
     segs = seg_model(conditioning_inputs[0])
 
     if latent_distribution == 'normal':
-        z_mean_prior, z_logvar_prior = prior_enc_model(conditioning_inputs + [segs])
+        z_mean_prior, z_logvar_prior = prior_enc_model(conditioning_inputs)# + [segs])
 
         z_samp = Lambda(transform_network_utils.sampling,
                             name='lambda_z_sampling_prior'
                             )([z_mean_prior, z_logvar_prior])
     else:
-        z_prior = prior_enc_model(conditioning_inputs + [segs])
+        z_prior = prior_enc_model(conditioning_inputs)# + [segs])
 
-        temperature = 0.5
-        z_samp = Lambda(lambda x:gumbel_softmax(x, hard=False))(z_prior)
+        temperature = 5.
+        z_samp = Lambda(lambda x:gumbel_softmax(x, temperature=temperature, hard=False), name='lambda_sampling_gumbel')(z_prior)
+
+        # actually normalize outputs to a probability, since this is what the KL loss expects
+        z_prior = Activation('softmax', name='latent_categorical_prior')(z_prior)
 
 
     y = dec_model(conditioning_inputs + [segs, z_samp])

@@ -296,7 +296,11 @@ class CVAE_segment_selector(object):
         self.clip_output_range = clip_output_range
 
         # TODO: rename this class to be a segment selector
-        self.n_segs = self.transform_latent_shape[0]
+        if self.latent_distribution == 'categorical':
+            self.n_segs = self.transform_latent_shape[0]
+        else:
+            self.n_segs = 32 # TODO: unhardcode
+
         self.segs_shape = self.conditioning_input_shapes[0][:-1] + (self.n_segs,)
 
     def create_modules(self):
@@ -312,8 +316,8 @@ class CVAE_segment_selector(object):
 
             self.prior_enc_model = \
                 cvae_modules.transform_encoder_model(
-                    input_shapes=self.conditioning_input_shapes + [self.segs_shape],
-                    input_names=self.conditioning_input_names + ['segs'],
+                    input_shapes=self.conditioning_input_shapes,# + [self.segs_shape],
+                    input_names=self.conditioning_input_names,# + ['segs'],
                     latent_shape=self.transform_latent_shape,
                     model_name='prior_encoder_cvae'.format(self.transform_name),
                     enc_params=self.transform_enc_params)
@@ -327,8 +331,8 @@ class CVAE_segment_selector(object):
 
             self.prior_enc_model = \
                 cvae_modules.transform_categorical_encoder_model(
-                    input_shapes=self.conditioning_input_shapes + [self.segs_shape],
-                    input_names=self.conditioning_input_names + ['segs'],
+                    input_shapes=self.conditioning_input_shapes,# + [self.segs_shape],
+                    input_names=self.conditioning_input_names,# + ['segs'],
                     latent_shape=self.transform_latent_shape,
                     model_name='prior_encoder_cvae'.format(self.transform_name),
                     enc_params=self.transform_enc_params)
@@ -341,6 +345,8 @@ class CVAE_segment_selector(object):
                 output_shape=self.output_shape,
                 source_input_idx=self.source_im_idx,
                 mask_by_conditioning_input_idx=self.mask_im_idx,
+                n_segs=self.n_segs,
+                latent_distribution=self.latent_distribution,
                 model_name=self.transform_name + '_transformer_cvae',
                 transform_type=self.transform_type,
                 color_transform_type=self.color_transform_type,
@@ -418,7 +424,7 @@ class CVAE_segment_selector(object):
                 mu_target=self.trainer_model.get_layer('latent_mean_prior').output,
                 axis=-1)
         elif self.latent_distribution == 'categorical':
-            self.vae_metrics = metrics.VAE_metrics_categorical(n_categories=self.transform_latent_shape[0])
+            self.vae_metrics = metrics.VAE_metrics_categorical(prior=self.trainer_model.get_layer('latent_categorical_prior').output, n_categories=self.n_segs)
 
     def get_models(self):
         return [self.transform_enc_model, self.transformer_model, self.prior_enc_model, self.seg_model]

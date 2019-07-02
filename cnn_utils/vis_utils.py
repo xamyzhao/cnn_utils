@@ -277,7 +277,6 @@ def xy_flow_to_im_cmap(flow):
 
     # put the angle into bins
     flow_angle_binned = np.digitize(flow_angle, np.linspace(0, n_vals-1, n_vals), right=True)
-    print(np.max(flow_angle_binned))
 
     flow_im = cm[flow_angle_binned]
 

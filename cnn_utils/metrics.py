@@ -705,13 +705,18 @@ class VAE_metrics_categorical(object):
 
     def __init__(self,
                  n_categories,
+                 prior=None,
                  axis=1):
         self.n_categories = n_categories
         self.axis = axis
+        self.prior = prior
 
     def kl_categorical(self, y_true, y_pred):
         eps = 1e-8
-        return -y_pred * (tf.log(y_pred + eps) - tf.log(1. / self.n_categories))
+        if self.prior is None:
+            return K.sum(y_pred * (K.log(y_pred + eps) - tf.log(1. / self.n_categories)), axis=self.axis)
+        else:
+            return K.sum(y_pred * (K.log(y_pred + eps) - K.log(self.prior + eps)), axis=self.axis)
 
 class VAE_metrics(object):
     """
