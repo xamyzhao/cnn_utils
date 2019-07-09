@@ -10,14 +10,13 @@ def pad_or_crop_to_shape(
         I,
         out_shape,
         border_color=(255, 255, 255)):
-
     if not isinstance(border_color, tuple):
         n_chans = I.shape[-1]
         border_color = tuple([border_color] * n_chans)
 
     # an out_shape with a dimension value of None means just don't crop or pad in that dim
     border_size = [out_shape[d] - I.shape[d] if out_shape[d] is not None else 0 for d in range(2)]
-    #border_size = (out_shape[0] - I.shape[0], out_shape[1] - I.shape[1])
+
     if border_size[0] > 0:
         I = cv2.copyMakeBorder(I,
                                int(math.floor(border_size[0] / 2.0)),
@@ -103,5 +102,3 @@ def create_gaussian_kernel(sigma, n_sigmas_per_side=8, n_dims=2):
     #    cv2.imwrite('gauss_z.jpg', gauss_kernel_2d[:, :,gauss_kernel_2d.shape[2]/2 ]*255)
     # gauss_kernel_2d = np.reshape(gauss_kernel_2d, gauss_kernel_2d.shape + (1,1))
     return gauss_kernel_2d
-
-
