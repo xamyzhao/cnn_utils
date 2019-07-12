@@ -481,12 +481,13 @@ class TimeSliceLoss(object):
 
 
 class TimeSummedLoss(object):
-    def __init__(self, loss_fn,
+    def __init__(self, loss_fn, weights_output=None,
                      time_axis=-2, compute_mean=True, pad_amt=None,
                      compute_over_frame_idxs=None,
                      ):
         self.time_axis = time_axis
         self.loss_fn = loss_fn
+        self.weights_output = weights_output # in case we want to predict the weight for each time step
         self.compute_mean = compute_mean    
         self.pad_amt = pad_amt
         self.include_frames = compute_over_frame_idxs
@@ -506,9 +507,18 @@ class TimeSummedLoss(object):
         true_frames = tf.unstack(y_true, num=n_frames, axis=self.time_axis)
         pred_frames = tf.unstack(y_pred, num=n_frames, axis=self.time_axis)
 
+
+        if self.weights_output is not None:
+            weights_list = tf.unstack(self.weights_output, num=n_frames, axis=-1)
+        else:
+            weights_list = None
+
         total_loss = 0
         for t in include_frames:
             loss = self.loss_fn(y_true=true_frames[t], y_pred=pred_frames[t])
+            if weights_list is not None:
+                loss *= weights_list[t]
+
             total_loss += loss
 
         if self.compute_mean:
@@ -696,6 +706,26 @@ class LearnedSigmaL2(object):
 
         # we will scale later to K.sum
         return  0.5 * tf.divide(K.square(y_pred - y_true) + reg, var_map)
+
+
+
+class WeightedLengthDistributionLoss(object):
+    def __init__(self, length_mu, length_sigma, is_done_model):
+        self.length_mu = length_mu
+        self.length_sigma = length_sigma
+        self.is_done_model = is_done_model
+
+    def compute_loss(self, y_true, y_pred):
+        eps = 1e-4
+        # assumes that the inputs have been stacked in this order
+        is_done_preds = self.is_done_model(y_pred)
+
+        seq_len = y_pred.get_shape().as_list()[-1]
+        seq_lens = tf.range(0, seq_len)
+        seq_len_log_likelihoods = -tf.square(seq_lens - self.length_mu) / (2 * self.length_sigma ** 2)
+
+        # weight log likelihoods by probability that the sequence is done
+        return -tf.reduce_mean(seq_len_log_likelihoods * is_done_preds)
 
 
 class VAE_metrics_categorical(object):

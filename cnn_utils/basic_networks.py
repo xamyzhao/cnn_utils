@@ -166,6 +166,8 @@ def encoder(x, img_shape,
 
 
 def encoder_model(img_shape,
+                  dense_size=None,
+                  activation=None,
                 conv_chans = None,
                 n_convs_per_stage = 1,
                 min_h = 5, min_c = None,
@@ -181,6 +183,11 @@ def encoder_model(img_shape,
                 use_residuals=use_residuals,
                 use_maxpool=use_maxpool
                 )
+    if dense_size is not None:
+        y = Flatten()(y)
+        y = Dense(dense_size)(y)
+    if activation is not None:
+        y = Activation(activation)(y)
     return Model(inputs=x, outputs=y, name='{}_encoder_model'.format(prefix))
 
 
