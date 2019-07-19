@@ -76,11 +76,11 @@ def vgg_norm(shape=(64,64,3), normalized_inputs=False):
     img_input = Input(shape=shape)
 
     if normalized_inputs:
-        vgg_model_file = '../evolving_wilds/cnn_utils/vgg_normtanh.h5'
+        vgg_model_file = '../evolving_wilds/cnn_utils/vgg_normtanh_ims{}-{}.h5'.format(shape[0], shape[1])
         img = Lambda(vgg_preprocess_norm,
             name='lambda_preproc_norm-11')(img_input)
     else:
-        vgg_model_file = '../evolving_wilds/cnn_utils/vgg_01.h5'
+        vgg_model_file = '../evolving_wilds/cnn_utils/vgg_01_ims{}-{}.h5'.format(shape[0], shape[1])
         img = Lambda(vgg_preprocess,
             name='lambda_preproc_clip01')(img_input)
 
@@ -507,7 +507,6 @@ class TimeSummedLoss(object):
         true_frames = tf.unstack(y_true, num=n_frames, axis=self.time_axis)
         pred_frames = tf.unstack(y_pred, num=n_frames, axis=self.time_axis)
 
-
         if self.weights_output is not None:
             weights_list = tf.unstack(self.weights_output, num=n_frames, axis=-1)
         else:
@@ -517,7 +516,8 @@ class TimeSummedLoss(object):
         for t in include_frames:
             loss = self.loss_fn(y_true=true_frames[t], y_pred=pred_frames[t])
             if weights_list is not None:
-                loss *= weights_list[t]
+                curr_weights = tf.expand_dims(weights_list[t], axis=-1)
+                loss = tf.multiply(loss, curr_weights)
 
             total_loss += loss
 
@@ -718,14 +718,15 @@ class WeightedLengthDistributionLoss(object):
     def compute_loss(self, y_true, y_pred):
         eps = 1e-4
         # assumes that the inputs have been stacked in this order
-        is_done_preds = self.is_done_model(y_pred)
+        #is_done_preds = self.is_done_model(y_pred)
 
         seq_len = y_pred.get_shape().as_list()[-1]
-        seq_lens = tf.range(0, seq_len)
+        seq_lens = tf.reshape(tf.range(0, seq_len, dtype=tf.float32), [1, 1, seq_len])
         seq_len_log_likelihoods = -tf.square(seq_lens - self.length_mu) / (2 * self.length_sigma ** 2)
+        weighted_ll = tf.log(y_pred + eps) + seq_len_log_likelihoods
 
         # weight log likelihoods by probability that the sequence is done
-        return -tf.reduce_mean(seq_len_log_likelihoods * is_done_preds)
+        return -tf.reduce_mean(weighted_ll)
 
 
 class VAE_metrics_categorical(object):

@@ -20,6 +20,8 @@ def label_ims(ims_batch, labels=None,
               inverse_normalize=False,
               normalize=False,
               clip_flow=10, display_h=128, pad_top=None, clip_norm=None,
+              padding_size=0, padding_color=255,
+              border_size=0, border_color=0,
               color_space='rgb', combine_from_axis=0, concat_axis=0):
     '''
     Displays a batch of matrices as an image.
@@ -173,10 +175,30 @@ def label_ims(ims_batch, labels=None,
 
         if pad_top:
             curr_im = np.concatenate([np.zeros((pad_top, curr_im.shape[1], curr_im.shape[2])), curr_im], axis=0)
+
+        if border_size > 0:
+            # add a border all around the image
+            curr_im = cv2.copyMakeBorder(
+                curr_im, border_size, border_size, border_size, border_size,
+                borderType=cv2.BORDER_CONSTANT, value=border_color)
+
+
+        if padding_size > 0 and i < batch_size - 1:
+            # include a border between images
+            padding_shape = list(curr_im.shape[:3])
+            padding_shape[concat_axis] = padding_size
+
+            curr_im = np.concatenate([curr_im, np.ones(padding_shape) * padding_color], axis=concat_axis)
+        
         out_im.append(curr_im)
 
     out_im = np.concatenate(out_im, axis=concat_axis).astype(np.uint8)
-    font_size = 15
+    
+    if display_h > 50:
+        font_size = 15
+    else:
+        font_size = 10
+
     max_text_width = int(17 * display_h / 128.)  # empirically determined
     if labels is not None and len(labels) > 0:
         im_pil = Image.fromarray(out_im)

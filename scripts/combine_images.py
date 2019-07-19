@@ -4,8 +4,10 @@ import cv2
 import argparse
 import re
 import numpy as np
+import sys
 import time
 
+sys.path.append('../evolving_wilds')
 from cnn_utils import image_utils, vis_utils
 
 from PIL import Image, ImageDraw, ImageFont
