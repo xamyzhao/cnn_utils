@@ -367,9 +367,11 @@ def decoder(x,
         target_vol_sizes = default_target_vol_sizes
     else:
         print('Target concat vols to match shapes to: {}'.format(target_vol_sizes))
+
+        # TODO: check that this logic makes sense for more convs
         # fill in any Nones that we might have in our target_vol_sizes
-        filled_target_vol_sizes = [None] * len(default_target_vol_sizes)
-        for i in range(n_convs - 1):
+        filled_target_vol_sizes = [None] * len(target_vol_sizes)
+        for i in range(n_convs):
             if i < len(target_vol_sizes) and target_vol_sizes[i] is not None:
                 filled_target_vol_sizes[i] = target_vol_sizes[i]
         target_vol_sizes = filled_target_vol_sizes
@@ -379,6 +381,7 @@ def decoder(x,
 
     curr_shape = np.asarray(encoded_shape[:n_dims])
     for i in range(n_convs):
+        print(target_vol_sizes[i])
         if i < len(target_vol_sizes) and target_vol_sizes[i] is not None:
             x = _pad_or_crop_to_shape(x, curr_shape, target_vol_sizes[i])
             curr_shape = np.asarray(target_vol_sizes[i])  # we will upsample first thing next stage

@@ -460,7 +460,6 @@ def apply_transformation(x_source, x_transformation,
             x_color_out = Multiply()([x_source, x_transformation])
         else:
             raise NotImplementedError('Only color transform types delta and mult are supported!')
-        print(output_shape)
         im_out = Reshape(output_shape, name='color_transformer')(x_color_out)
     else:
         im_out = x_transformation

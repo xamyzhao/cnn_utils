@@ -3,7 +3,18 @@ from basic_network_utils import network_layers
 
 from keras.layers import Input, Lambda, Reshape
 from keras.layers.pooling import MaxPooling3D
+from keras.models import Model
 import numpy as np
+
+from neuron.layers import SpatialTransformer
+
+def warp_model(img_shape, interp_mode='linear', indexing='ij'):
+    n_dims = len(img_shape) - 1
+    img_in = Input(img_shape, name='input_img')
+    flow_in = Input(img_shape[:-1] + (n_dims,), name='input_flow')
+    img_warped = SpatialTransformer(interp_mode, indexing=indexing, name='densespatialtransformer_img')([img_in, flow_in])
+    
+    return Model(inputs=[img_in, flow_in], outputs=img_warped, name='warp_model')
 
 def randflow_model(img_shape,
 				   model,
@@ -31,9 +42,9 @@ def randflow_model(img_shape,
 		flow_shape = img_shape[:-1] + (n_dims,)
 	# random flow field
 	if flow_amp is None:
-		flow = RandFlow(name='randflow', img_shape=flow_shape, blur_sigma=blur_sigma, flow_sigma=flow_sigma)(flow)
+		flow = network_layers.RandFlow(name='randflow', img_shape=flow_shape, blur_sigma=blur_sigma, flow_sigma=flow_sigma)(flow)
 	elif flow_sigma is None:
-		flow = RandFlow_Uniform(name='randflow', img_shape=flow_shape, blur_sigma=blur_sigma, flow_amp=flow_amp)(flow)
+		flow = network_layers.RandFlow_Uniform(name='randflow', img_shape=flow_shape, blur_sigma=blur_sigma, flow_amp=flow_amp)(flow)
 
 	if n_dims == 3:
 		flow = Reshape(flow_shape)(flow)
@@ -56,5 +67,6 @@ def randflow_model(img_shape,
 		if not isinstance(model_outputs, list):
 			model_outputs = [model_outputs]
 	else:
-		model_outputs = [x_warped]
+        # a little unintuitive
+		model_outputs = [x_warped, flow]
 	return Model(inputs=[x_in], outputs=model_outputs, name=model_name)
