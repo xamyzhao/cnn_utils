@@ -63,6 +63,9 @@ def pyrDown_batch(X):
 
 
 def resize_batch(X, scale_factor):
+    if not isinstance(scale_factor, tuple):
+        scale_factor = (scale_factor, scale_factor)
+
     n = X.shape[0]
     h = X.shape[1]
     w = X.shape[2]
@@ -78,9 +81,9 @@ def resize_batch(X, scale_factor):
         n_batch_chans = X_batch.shape[-1]
 
         if np.max(X_batch) <= 1.0:
-            X_batch = cv2.resize(X_batch * 255, None, fx=scale_factor, fy=scale_factor) / 255.
+            X_batch = cv2.resize(X_batch * 255, None, fx=scale_factor[0], fy=scale_factor[1]) / 255.
         else:
-            X_batch = cv2.resize(X_batch, None, fx=scale_factor, fy=scale_factor)
+            X_batch = cv2.resize(X_batch, None, fx=scale_factor[0], fy=scale_factor[1])
         X_resized.append(np.reshape(X_batch, X_batch.shape[:2] + (n_batch_chans,)))
     X_temp = np.concatenate(X_resized, axis=-1)
     h_new = X_temp.shape[0]

@@ -192,12 +192,15 @@ def label_ims(ims_batch, labels=None,
         
         out_im.append(curr_im)
 
-    out_im = np.concatenate(out_im, axis=concat_axis).astype(np.uint8)
-    
     if display_h > 50:
         font_size = 15
     else:
         font_size = 10
+
+    if concat_axis is not None:
+        out_im = np.concatenate(out_im, axis=concat_axis).astype(np.uint8)
+    else:
+        out_im = np.concatenate(out_im, axis=0).astype(np.uint8)
 
     max_text_width = int(17 * display_h / 128.)  # empirically determined
     if labels is not None and len(labels) > 0:
@@ -219,13 +222,16 @@ def label_ims(ims_batch, labels=None,
                     # assume that this is a 1D array
                     curr_labels = np.squeeze(labels[i]).astype(np.float32)
                     formatted_text = np.array2string(curr_labels, precision=2, separator=',')
-                    #', '.join(['{}'.format(
+                    # ', '.join(['{}'.format(
                     #	np.around(labels[i][j], 2)) for j in range(labels[i].size)])
                 else:
                     formatted_text = '{}'.format(labels[i])
 
                 if display_h > 30:  # only print label if we have room
-                    font = ImageFont.truetype('Ubuntu-M.ttf', font_size)
+                    try:
+                        font = ImageFont.truetype('Ubuntu-M.ttf', font_size)
+                    except:
+                        font = ImageFont.truetype('arial.ttf', font_size)
                     # wrap the text so it fits
                     formatted_text = textwrap.wrap(formatted_text, width=max_text_width)
 
@@ -237,6 +243,49 @@ def label_ims(ims_batch, labels=None,
 
         out_im = np.asarray(im_pil)
 
+    # else:
+    #     out_im = [im.astype(np.uint8) for im in out_im]
+    #
+    #     max_text_width = int(17 * display_h / 128.)  # empirically determined
+    #     if labels is not None and len(labels) > 0:
+    #         for i, im in enumerate(out_im):
+    #             im_pil = Image.fromarray(im)
+    #             draw = ImageDraw.Draw(im_pil)
+    #
+    #
+    #             if len(labels) > i:  # if we have a label for this image
+    #                 if type(labels[i]) == tuple or type(labels[i]) == list:
+    #                     # format tuple or list nicely
+    #                     formatted_text = ', '.join([
+    #                         labels[i][j].decode('UTF-8') if type(labels[i][j]) == np.unicode_ \
+    #                             else labels[i][j] if type(labels[i][j]) == str \
+    #                             else str(round(labels[i][j], 2)) if isinstance(labels[i][j], float) \
+    #                             else str(labels[i][j]) for j in range(len(labels[i]))])
+    #                 elif type(labels[i]) == float or type(labels[i]) == np.float32:
+    #                     formatted_text = str(round(labels[i], 2))  # round floats to 2 digits
+    #                 elif isinstance(labels[i], np.ndarray):
+    #                     # assume that this is a 1D array
+    #                     curr_labels = np.squeeze(labels[i]).astype(np.float32)
+    #                     formatted_text = np.array2string(curr_labels, precision=2, separator=',')
+    #                     # ', '.join(['{}'.format(
+    #                     #	np.around(labels[i][j], 2)) for j in range(labels[i].size)])
+    #                 else:
+    #                     formatted_text = '{}'.format(labels[i])
+    #
+    #                 if display_h > 30:  # only print label if we have room
+    #                     try:
+    #                         font = ImageFont.truetype('Ubuntu-M.ttf', font_size)
+    #                     except:
+    #                         font = ImageFont.truetype('arial.ttf', font_size)
+    #                     # wrap the text so it fits
+    #                     formatted_text = textwrap.wrap(formatted_text, width=max_text_width)
+    #
+    #                     for li, line in enumerate(formatted_text):
+    #                         draw.text((5, 5 + 14 * li), line, font=font, fill=(50, 50, 255))
+    #             im = np.asarray(im_pil)
+    if concat_axis is None:
+        # un-concat the image. faster this way
+        out_im = np.split(out_im, batch_size, axis=combine_from_axis)
     return out_im
 
 def concatenate_with_pad(ims_list, pad_to_im_idx=None, axis=None, pad_val=0.):
