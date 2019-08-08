@@ -198,6 +198,67 @@ def transform_categorical_encoder_model(input_shapes, input_names=None,
 
     return Model(inputs=inputs, outputs=[z_logits], name=model_name)
 
+# TODO: move out of cvae file
+def nonconditional_decoder_model(output_shape,
+                                 enc_input_shape=None,
+                                 model_name='CVAE_transformer',
+                                 latent_shape=(100,),
+                                 enc_params=None,
+                                 clip_output_range=None,
+                                 ):
+
+    # we will always give z as a flattened vector
+    z_input = Input((np.prod(latent_shape),), name='z_input')
+
+    # just ignore the conditioning input
+    concat_decoder_outputs_with = None
+    concat_skip_sizes = None
+
+    if enc_input_shape is None:
+        enc_input_shape = output_shape
+
+    if 'ks' not in enc_params:
+        enc_params['ks'] = 3
+
+    if not enc_params['fully_conv']:
+        # determine what size to reshape the latent vector to
+        reshape_encoding_to = basic_networks.get_encoded_shape(
+            img_shape=enc_input_shape,
+            conv_chans=enc_params['nf_enc'],
+        )
+
+        x_enc = Dense(np.prod(reshape_encoding_to))(z_input)
+        x_enc = LeakyReLU(0.2)(x_enc)
+    else:
+        # latent representation is already in correct shape
+        reshape_encoding_to = latent_shape
+        x_enc = z_input
+
+    x_enc = Reshape(reshape_encoding_to)(x_enc)
+
+
+    print('Decoder starting shape: {}'.format(reshape_encoding_to))
+
+    im_out = basic_networks.decoder(
+        x_enc, output_shape,
+        encoded_shape=reshape_encoding_to,
+        prefix='vae_dec',
+        conv_chans=enc_params['nf_dec'], ks=enc_params['ks'],
+        n_convs_per_stage=enc_params['n_convs_per_stage'],
+        use_upsample=enc_params['use_upsample'],
+        include_skips=None,
+        target_vol_sizes=None
+    )
+
+
+    if clip_output_range is not None:
+        im_out = Lambda(lambda x: tf.clip_by_value(x, clip_output_range[0], clip_output_range[1]),
+            name='lambda_clip_output_{}-{}'.format(clip_output_range[0], clip_output_range[1]))(im_out)
+
+
+    return Model(inputs=[z_input], outputs=[im_out], name=model_name)
+
+
 def transformer_concat_model(conditioning_input_shapes, conditioning_input_names=None,
                              output_shape=None,
                              model_name='CVAE_transformer',
