@@ -109,7 +109,7 @@ def label_ims(ims_batch, labels=None,
             labeled_im_flat[labels_im_flat == l,:] = cmap[l]
         ims_batch = labeled_im_flat.reshape((-1,) + ims_batch.shape[1:-1] + (3,))
 
-    elif ims_batch.shape[-1] == 3 and inverse_normalize:
+    elif inverse_normalize:
         ims_batch = image_utils.inverse_normalize(ims_batch)
 
     elif normalize:

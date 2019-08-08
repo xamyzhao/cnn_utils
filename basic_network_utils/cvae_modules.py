@@ -323,7 +323,8 @@ def transformer_concat_model(conditioning_input_shapes, conditioning_input_names
                     concat_skip_sizes[-1]
                 ))
         '''
-        x_enc = Dense(np.prod(reshape_encoding_to))(z_input)
+        x_enc = Dense(np.prod(reshape_encoding_to), name='dense_encoding_to_vol')(z_input)
+        x_enc = LeakyReLU(0.2)(x_enc)
     else:
         # latent representation is already in correct shape
         reshape_encoding_to = transform_latent_shape
