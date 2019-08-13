@@ -25,6 +25,7 @@ class CVAE(object):
                  include_aug_matrix=False,
                  aug_pad_vals=(1, 1),
                  clip_output_range=None,
+                 conditioning_type='concat'
         ):
         self.conditioning_input_shapes = [tuple(s) for s in conditioning_input_shapes]
         self.conditioning_input_names = conditioning_input_names
@@ -38,14 +39,24 @@ class CVAE(object):
         self.source_im_idx = source_im_idx
         self.mask_im_idx = mask_im_idx
 
+        if conditioning_type == 'unet':
+            self.do_use_unet_transformer = True
+        else:
+            self.do_use_unet_transformer = False
+
         # correct for outdated spec of nf_enc
-        self.transform_enc_params = transform_enc_params.copy()
-        if 'nf_enc' not in self.transform_enc_params.keys():
-            self.transform_enc_params['nf_enc'] = transform_enc_params['enc_chans']
-        if 'nf_dec' not in self.transform_enc_params.keys():
-            self.transform_enc_params['nf_dec'] = list(reversed(self.transform_enc_params['nf_enc']))
-        if 'ks' not in self.transform_enc_params:
-            self.transform_enc_params['ks'] = 3
+        if transform_enc_params is None:
+            self.do_use_dense_encoder = True
+        else:
+            self.do_use_dense_encoder = False
+
+            self.transform_enc_params = transform_enc_params.copy()
+            if 'nf_enc' not in self.transform_enc_params.keys():
+                self.transform_enc_params['nf_enc'] = transform_enc_params['enc_chans']
+            if 'nf_dec' not in self.transform_enc_params.keys():
+                self.transform_enc_params['nf_dec'] = list(reversed(self.transform_enc_params['nf_enc']))
+            if 'ks' not in self.transform_enc_params:
+                self.transform_enc_params['ks'] = 3
 
         if dec_params is None:
             self.dec_params = self.transform_enc_params
@@ -78,32 +89,59 @@ class CVAE(object):
         self.clip_output_range = clip_output_range
 
     def create_modules(self):
-        print('Creating CVAE with encoder params {}'.format(self.transform_enc_params))
-        self.transform_enc_model = \
-            cvae_modules.transform_encoder_model(
-                input_shapes=self.ae_input_shapes,
-                input_names=self.ae_input_names,
-                latent_shape=self.transform_latent_shape,
-                model_name='{}_transform_encoder_cvae'.format(self.transform_name),
-                enc_params=self.transform_enc_params)
+        if self.do_use_dense_encoder:
+            print('Creating CVAE with dense encoder')
+            self.transform_enc_model = \
+                cvae_modules.transform_dense_encoder_model(
+                    input_shapes=self.ae_input_shapes,
+                    input_names=self.ae_input_names,
+                    latent_shape=self.transform_latent_shape,
+                    model_name='{}_transform_dense_encoder_cvae'.format(self.transform_name),
+                    enc_params=self.transform_enc_params)
+        else:
+            print('Creating CVAE with encoder params {}'.format(self.transform_enc_params))
+            self.transform_enc_model = \
+                cvae_modules.transform_encoder_model(
+                    input_shapes=self.ae_input_shapes,
+                    input_names=self.ae_input_names,
+                    latent_shape=self.transform_latent_shape,
+                    model_name='{}_transform_encoder_cvae'.format(self.transform_name),
+                    enc_params=self.transform_enc_params)
 
-        self.transformer_model = \
-            cvae_modules.transformer_concat_model(
-                conditioning_input_shapes=self.conditioning_input_shapes,
-                conditioning_input_names=self.conditioning_input_names,
-                output_shape=self.output_shape,
-                source_input_idx=self.source_im_idx,
-                mask_by_conditioning_input_idx=self.mask_im_idx,
-                model_name=self.transform_name + '_transformer_cvae',
-                transform_type=self.transform_type,
-                color_transform_type=self.color_transform_type,
-                condition_on_image=self.condition_on_image,
-                n_concat_scales=self.n_concat_scales,
-                transform_latent_shape=self.transform_latent_shape,
-                enc_params=self.dec_params,
-                transform_activation=self.transform_activation,
-                clip_output_range=self.clip_output_range
-        )
+        if self.do_use_unet_transformer:
+            self.transformer_model = \
+                cvae_modules.transformer_unet_model(
+                    conditioning_input_shapes=self.conditioning_input_shapes,
+                    conditioning_input_names=self.conditioning_input_names,
+                    output_shape=self.output_shape,
+                    source_input_idx=self.source_im_idx,
+                    mask_by_conditioning_input_idx=self.mask_im_idx,
+                    model_name=self.transform_name + '_transformer_cvae',
+                    transform_type=self.transform_type,
+                    color_transform_type=self.color_transform_type,
+                    transform_latent_shape=self.transform_latent_shape,
+                    enc_params=self.dec_params,
+                    transform_activation=self.transform_activation,
+                    clip_output_range=self.clip_output_range
+            )
+        else:
+            self.transformer_model = \
+                cvae_modules.transformer_concat_model(
+                    conditioning_input_shapes=self.conditioning_input_shapes,
+                    conditioning_input_names=self.conditioning_input_names,
+                    output_shape=self.output_shape,
+                    source_input_idx=self.source_im_idx,
+                    mask_by_conditioning_input_idx=self.mask_im_idx,
+                    model_name=self.transform_name + '_transformer_cvae',
+                    transform_type=self.transform_type,
+                    color_transform_type=self.color_transform_type,
+                    condition_on_image=self.condition_on_image,
+                    n_concat_scales=self.n_concat_scales,
+                    transform_latent_shape=self.transform_latent_shape,
+                    enc_params=self.dec_params,
+                    transform_activation=self.transform_activation,
+                    clip_output_range=self.clip_output_range
+            )
 
     def create_train_wrapper(self, n_samples=1):
         self.trainer_model = \

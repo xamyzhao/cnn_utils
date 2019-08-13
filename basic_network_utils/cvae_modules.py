@@ -50,6 +50,59 @@ def gumbel_softmax(logits, temperature, hard=False):
         y = tf.stop_gradient(y_hard - y) + y
     return y
 
+
+def transform_dense_encoder_model(input_shapes, input_names=None,
+                            latent_shape=(50,),
+                            model_name='VTE_transform_encoder',
+                            enc_params=None,
+                            ):
+    '''
+    Generic encoder for a stack of inputs
+
+    :param input_shape:
+    :param latent_shape:
+    :param model_name:
+    :param enc_params:
+    :return:
+    '''
+    if not isinstance(input_shapes, list):
+        input_shapes = [input_shapes]
+
+    if input_names is None:
+        input_names = ['input_{}'.format(ii) for ii in range(len(input_shapes))]
+
+    inputs = []
+    for ii, input_shape in enumerate(input_shapes):
+        inputs.append(Input(input_shape, name='input_{}'.format(input_names[ii])))
+
+    if len(inputs) > 1:
+        inputs_stacked = Concatenate(name='concat_inputs', axis=-1)(inputs)
+    else:
+        inputs_stacked = inputs[0]
+    input_stack_shape = inputs_stacked.get_shape().as_list()[1:]
+    n_dims = len(input_stack_shape) - 1
+
+    assert len(latent_shape) == 1
+    latent_size = latent_shape[0]
+
+    z = Dense(latent_shape * 2, name='dense_1')(inputs_stacked)
+    z = LeakyReLU(0.2)(z)
+    z = Dense(latent_shape * 2)(z)
+
+
+    # the last layer in the basic encoder will be a convolution, so we should activate after it
+    x_transform_enc = LeakyReLU(0.2)(z)
+    x_transform_enc = Flatten()(x_transform_enc)
+
+    z_mean = Dense(latent_size, name='latent_mean',
+        kernel_initializer=keras_init.RandomNormal(mean=0., stddev=0.00001))(x_transform_enc)
+    z_logvar = Dense(latent_size, name='latent_logvar',
+                    bias_initializer=keras_init.RandomNormal(mean=-2., stddev=1e-10),
+                    kernel_initializer=keras_init.RandomNormal(mean=0., stddev=1e-10),
+                )(x_transform_enc)
+
+    return Model(inputs=inputs, outputs=[z_mean, z_logvar], name=model_name)
+
 def transform_encoder_model(input_shapes, input_names=None,
                             latent_shape=(50,),
                             model_name='VTE_transform_encoder',
@@ -259,6 +312,142 @@ def nonconditional_decoder_model(output_shape,
 
 
     return Model(inputs=[z_input], outputs=[im_out], name=model_name)
+
+def transformer_unet_model(conditioning_input_shapes, conditioning_input_names=None,
+                             output_shape=None,
+                             model_name='CVAE_transformer',
+                             transform_latent_shape=(100,),
+                             transform_type=None,
+                             color_transform_type=None,
+                             enc_params=None,
+                             unet_nf_enc=[32, 32, 64, 64],
+                             transform_activation=None, clip_output_range=None,
+                             source_input_idx=None,
+                             mask_by_conditioning_input_idx=None,
+                             ):
+
+    # collect conditioning inputs, and concatentate them into a stack
+    if not isinstance(conditioning_input_shapes, list):
+        conditioning_input_shapes = [conditioning_input_shapes]
+    if conditioning_input_names is None:
+        conditioning_input_names = ['cond_input_{}'.format(ii) for ii in range(len(conditioning_input_shapes))]
+
+    conditioning_inputs = []
+    for ii, input_shape in enumerate(conditioning_input_shapes):
+        conditioning_inputs.append(Input(input_shape, name=conditioning_input_names[ii]))
+
+    if len(conditioning_inputs) > 1:
+        conditioning_input_stack = Concatenate(name='concat_cond_inputs', axis=-1)(conditioning_inputs)
+    else:
+        conditioning_input_stack = conditioning_inputs[0]
+
+    conditioning_input_shape = tuple(conditioning_input_stack.get_shape().as_list()[1:])
+
+    n_dims = len(conditioning_input_shape) - 1
+
+    # we will always give z as a flattened vector
+    z_input = Input((np.prod(transform_latent_shape),), name='z_input')
+
+    # determine what we should apply the transformation to
+    if source_input_idx is None:
+        # the image we want to transform is exactly the input of the conditioning branch
+        x_source = conditioning_input_stack
+        source_input_shape = conditioning_input_shape
+    else:
+        # slice conditioning input to get the single source im that we will apply the transform to
+        source_input_shape = conditioning_input_shapes[source_input_idx]
+        x_source = conditioning_inputs[source_input_idx]
+
+    # assume the output is going to be the transformed source input, so it should be the same shape
+    if output_shape is None:
+        output_shape = source_input_shape
+
+    if mask_by_conditioning_input_idx is None:
+        x_mask = None
+    else:
+        print('Masking output by input {} with name {}'.format(
+            mask_by_conditioning_input_idx,
+            conditioning_input_names[mask_by_conditioning_input_idx]
+        ))
+        mask_shape = conditioning_input_shapes[mask_by_conditioning_input_idx]
+        x_mask = conditioning_inputs[mask_by_conditioning_input_idx]
+
+    if transform_type == 'flow':
+        layer_prefix = 'flow'
+    elif transform_type == 'color':
+        layer_prefix = 'color'
+    else:
+        layer_prefix = 'synth'
+
+    if 'ks' not in enc_params:
+        enc_params['ks'] = 3
+
+    if not enc_params['fully_conv']:
+        # determine what size to reshape the latent vector to
+        reshape_encoding_to = basic_networks.get_encoded_shape(
+            img_shape=conditioning_input_shape,
+            conv_chans=enc_params['nf_enc'],
+        )
+        x_enc = Dense(np.prod(reshape_encoding_to), name='dense_encoding_to_vol')(z_input)
+        x_enc = LeakyReLU(0.2)(x_enc)
+    else:
+        # latent representation is already in correct shape
+        reshape_encoding_to = transform_latent_shape
+        x_enc = z_input
+
+    x_enc = Reshape(reshape_encoding_to)(x_enc)
+
+
+    print('Decoder starting shape: {}'.format(reshape_encoding_to))
+
+    x = basic_networks.decoder(
+        x_enc, output_shape,
+        encoded_shape=reshape_encoding_to,
+        prefix='{}_dec'.format(layer_prefix),
+        conv_chans=enc_params['nf_dec'], ks=enc_params['ks'],
+        n_convs_per_stage=enc_params['n_convs_per_stage'],
+        use_upsample=enc_params['use_upsample'],
+        include_skips=None,
+        target_vol_sizes=None
+    )
+
+
+    x = Concatenate(axis=-1, name='concat_with_cond')([conditioning_input_stack, x])
+    x_transformation = basic_networks.unet2D(x, input_shape=x.get_shape().as_list()[1:], out_im_chans=output_shape[-1],
+                              nf_enc=unet_nf_enc,
+                              )
+
+    if transform_activation is not None:
+        x_transformation = Activation(
+            transform_activation,
+            name='activation_transform_{}'.format(transform_activation))(x_transformation)
+
+        if transform_type == 'color' and 'delta' in color_transform_type and transform_activation=='tanh':
+            # TODO: maybe move this logic
+            # if we are learning a colro delta with a tanh, make sure to multiply it by 2
+            x_transformation = Lambda(lambda x: x * 2, name='lambda_scale_tanh')(x_transformation)
+
+    if mask_by_conditioning_input_idx is not None:
+        x_transformation = Multiply(name='mult_mask_transformation')([x_transformation, x_mask])
+    if transform_type is not None:
+        im_out, transform_out = apply_transformation(x_source, x_transformation,
+            output_shape=source_input_shape, conditioning_input_shape=conditioning_input_shape, transform_name=transform_type,
+            apply_flow_transform=transform_type=='flow',
+            apply_color_transform=transform_type=='color',
+            color_transform_type=color_transform_type
+            )
+    else:
+        im_out = x_transformation
+
+    if clip_output_range is not None:
+        im_out = Lambda(lambda x: tf.clip_by_value(x, clip_output_range[0], clip_output_range[1]),
+            name='lambda_clip_output_{}-{}'.format(clip_output_range[0], clip_output_range[1]))(im_out)
+
+    if transform_type is not None:
+        return Model(inputs=conditioning_inputs + [z_input], outputs=[im_out, transform_out], name=model_name)
+    else:
+        return Model(inputs=conditioning_inputs + [z_input], outputs=[im_out], name=model_name)
+
 
 
 def transformer_concat_model(conditioning_input_shapes, conditioning_input_names=None,
