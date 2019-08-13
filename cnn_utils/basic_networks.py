@@ -106,11 +106,19 @@ def encoder(x, img_shape,
     elif not type(conv_chans) == list:
         n_convs = int(np.floor(np.log2(img_shape[0] / min_h)))
         conv_chans = [conv_chans] * (n_convs - 1) + [min_c]
+    else:
+        n_convs = len(conv_chans)
+
+    if isinstance(ks, list):
+        assert len(ks) == (n_convs + 1)  # specify for each conv, as well as the last one
+    else:
+        ks = [ks] * (n_convs + 1)
+
 
     for i in range(len(conv_chans)):
         #if n_convs_per_stage is not None and n_convs_per_stage > 1 or use_maxpool and n_convs_per_stage is not None:
         for ci in range(n_convs_per_stage):
-            x = myConv(nf=conv_chans[i], ks=ks, strides=1, n_dims=n_dims,
+            x = myConv(nf=conv_chans[i], ks=ks[i], strides=1, n_dims=n_dims,
                        prefix='{}_enc'.format(prefix),
                        suffix='{}_{}'.format(i, ci + 1))(x)
 
@@ -131,7 +139,7 @@ def encoder(x, img_shape,
             # changed 5/30/19, don't pool after our last conv
             x = myPool(n_dims=n_dims, prefix=prefix, suffix=i)(x)
         else:
-            x = myConv(conv_chans[i], ks=ks, strides=2, n_dims=n_dims,
+            x = myConv(conv_chans[i], ks=ks[i], strides=2, n_dims=n_dims,
                        prefix='{}_enc'.format(prefix), suffix=i)(x)
 
             # don't activate right after a maxpool, it makes no sense
@@ -142,7 +150,8 @@ def encoder(x, img_shape,
         # if the last number of channels is specified, convolve to that
         if n_convs_per_stage is not None and n_convs_per_stage > 1:
             for ci in range(n_convs_per_stage):
-                x = myConv(min_c, ks=ks, n_dims=n_dims, strides=1,
+                # TODO: we might not have enough ks for this
+                x = myConv(min_c, ks=ks[-1], n_dims=n_dims, strides=1,
                            prefix='{}_enc'.format(prefix), suffix='last_{}'.format(ci + 1))(x)
 
                 if ci == 0 and use_residuals:
@@ -151,7 +160,7 @@ def encoder(x, img_shape,
                     x = Add(name='{}_enc_{}_add_residual'.format(prefix, 'last'))([residual_input, x])
                 x = LeakyReLU(0.2, name='{}_enc_leakyrelu_last'.format(prefix))(x)
 
-        x = myConv(min_c, ks=ks, strides=1, n_dims=n_dims,
+        x = myConv(min_c, ks=ks[-1], strides=1, n_dims=n_dims,
                    prefix='{}_enc'.format(prefix),
                    suffix='_last')(x)
 

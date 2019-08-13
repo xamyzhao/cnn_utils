@@ -73,8 +73,10 @@ def transform_encoder_model(input_shapes, input_names=None,
     inputs = []
     for ii, input_shape in enumerate(input_shapes):
         inputs.append(Input(input_shape, name='input_{}'.format(input_names[ii])))
-
-    inputs_stacked = Concatenate(name='concat_inputs', axis=-1)(inputs)
+    if len(inputs) > 1:
+        inputs_stacked = Concatenate(name='concat_inputs', axis=-1)(inputs)
+    else:
+        inputs_stacked = inputs[0]
     input_stack_shape = inputs_stacked.get_shape().as_list()[1:]
     n_dims = len(input_stack_shape) - 1
 
@@ -283,7 +285,11 @@ def transformer_concat_model(conditioning_input_shapes, conditioning_input_names
     for ii, input_shape in enumerate(conditioning_input_shapes):
         conditioning_inputs.append(Input(input_shape, name=conditioning_input_names[ii]))
 
-    conditioning_input_stack = Concatenate(name='concat_cond_inputs', axis=-1)(conditioning_inputs)
+    if len(conditioning_inputs) > 1:
+        conditioning_input_stack = Concatenate(name='concat_cond_inputs', axis=-1)(conditioning_inputs)
+    else:
+        conditioning_input_stack = conditioning_inputs[0]
+
     conditioning_input_shape = tuple(conditioning_input_stack.get_shape().as_list()[1:])
 
     n_dims = len(conditioning_input_shape) - 1
@@ -790,5 +796,8 @@ def _collect_inputs(ae_input_shapes, ae_input_names,
     for ii, input_shape in enumerate(conditioning_input_shapes):
         conditioning_inputs.append(Input(input_shape, name=conditioning_input_names[ii]))
 
-    cond_stack = Concatenate(name='concat_cond_inputs', axis=-1)(conditioning_inputs)
+    if len(conditioning_inputs) > 1:
+        cond_stack = Concatenate(name='concat_cond_inputs', axis=-1)(conditioning_inputs)
+    else:
+        cond_stack = conditioning_inputs[0]
     return ae_inputs, ae_stack, conditioning_inputs, cond_stack
