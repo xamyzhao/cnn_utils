@@ -138,9 +138,9 @@ def transform_encoder_model(input_shapes, input_names=None,
         img_shape=input_stack_shape,
         conv_chans=enc_params['nf_enc'],
         min_h=None, min_c=None,
-        n_convs_per_stage=enc_params['n_convs_per_stage'],
-        use_residuals=enc_params['use_residuals'],
-        use_maxpool=enc_params['use_maxpool'],
+        n_convs_per_stage=enc_params['n_convs_per_stage'] if 'n_convs_per_stage' in enc_params else 1,
+        use_residuals=enc_params['use_residuals'] if 'use_residuals' in enc_params else False,
+        use_maxpool=enc_params['use_maxpool'] if 'use_maxpool' in enc_params else False,
         prefix='vte'
     )
 
@@ -298,9 +298,9 @@ def nonconditional_decoder_model(output_shape,
         x_enc, output_shape,
         encoded_shape=reshape_encoding_to,
         prefix='vae_dec',
-        conv_chans=enc_params['nf_dec'], ks=enc_params['ks'],
-        n_convs_per_stage=enc_params['n_convs_per_stage'],
-        use_upsample=enc_params['use_upsample'],
+        conv_chans=enc_params['nf_dec'], ks=enc_params['ks'] if 'ks' in enc_params else 3,
+        n_convs_per_stage=enc_params['n_convs_per_stage'] if 'n_convs_per_stage' in enc_params else 1,
+        use_upsample=enc_params['use_upsample'] if 'use_upsample' in enc_params else False,
         include_skips=None,
         target_vol_sizes=None
     )
@@ -404,9 +404,10 @@ def transformer_unet_model(conditioning_input_shapes, conditioning_input_names=N
         x_enc, output_shape,
         encoded_shape=reshape_encoding_to,
         prefix='{}_dec'.format(layer_prefix),
-        conv_chans=enc_params['nf_dec'], ks=enc_params['ks'],
-        n_convs_per_stage=enc_params['n_convs_per_stage'],
-        use_upsample=enc_params['use_upsample'],
+        conv_chans=enc_params['nf_dec'],
+        ks=enc_params['ks'] if 'ks' in enc_params else 3,
+        n_convs_per_stage=enc_params['n_convs_per_stage'] if 'n_convs_per_stage' in enc_params else 1,
+        use_upsample=enc_params['use_upsample'] if 'use_upsample' in enc_params else False,
         include_skips=None,
         target_vol_sizes=None
     )
@@ -595,9 +596,10 @@ def transformer_concat_model(conditioning_input_shapes, conditioning_input_names
         x_enc, output_shape,
         encoded_shape=reshape_encoding_to,
         prefix='{}_dec'.format(layer_prefix),
-        conv_chans=enc_params['nf_dec'], ks=enc_params['ks'],
-        n_convs_per_stage=enc_params['n_convs_per_stage'],
-        use_upsample=enc_params['use_upsample'],
+        conv_chans=enc_params['nf_dec'],
+        ks=enc_params['ks'] if 'ks' in enc_params else 3,
+        n_convs_per_stage=enc_params['n_convs_per_stage'] if 'n_convs_per_stage' in enc_params else 1,
+        use_upsample=enc_params['use_upsample'] if 'use_upsample' in enc_params else False,
         include_skips=concat_decoder_outputs_with,
         target_vol_sizes=concat_skip_sizes
     )
