@@ -320,7 +320,7 @@ def transformer_unet_model(conditioning_input_shapes, conditioning_input_names=N
                              transform_type=None,
                              color_transform_type=None,
                              enc_params=None,
-                             unet_nf_enc=[32, 32, 64, 64],
+                             unet_nf_enc=[64, 64, 64],
                              transform_activation=None, clip_output_range=None,
                              source_input_idx=None,
                              mask_by_conditioning_input_idx=None,
@@ -401,7 +401,7 @@ def transformer_unet_model(conditioning_input_shapes, conditioning_input_names=N
     print('Decoder starting shape: {}'.format(reshape_encoding_to))
 
     x = basic_networks.decoder(
-        x_enc, output_shape,
+        x_enc, output_shape[:-1] + (enc_params['nf_dec'][-1],),
         encoded_shape=reshape_encoding_to,
         prefix='{}_dec'.format(layer_prefix),
         conv_chans=enc_params['nf_dec'], ks=enc_params['ks'],

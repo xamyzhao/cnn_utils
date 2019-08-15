@@ -122,7 +122,8 @@ class CVAE(object):
                     transform_latent_shape=self.transform_latent_shape,
                     enc_params=self.dec_params,
                     transform_activation=self.transform_activation,
-                    clip_output_range=self.clip_output_range
+                    clip_output_range=self.clip_output_range,
+                    unet_nf_enc=self.dec_params['unet_nf_enc'] if 'unet_nf_enc' in self.dec_params else [64, 64, 64],
             )
         else:
             self.transformer_model = \
