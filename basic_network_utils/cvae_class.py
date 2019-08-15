@@ -39,10 +39,7 @@ class CVAE(object):
         self.source_im_idx = source_im_idx
         self.mask_im_idx = mask_im_idx
 
-        if conditioning_type == 'unet':
-            self.do_use_unet_transformer = True
-        else:
-            self.do_use_unet_transformer = False
+        self.conditioning_type = conditioning_type
 
         # correct for outdated spec of nf_enc
         if transform_enc_params is None:
@@ -108,7 +105,7 @@ class CVAE(object):
                     model_name='{}_transform_encoder_cvae'.format(self.transform_name),
                     enc_params=self.transform_enc_params)
 
-        if self.do_use_unet_transformer:
+        if 'unet' in self.conditioning_type:
             self.transformer_model = \
                 cvae_modules.transformer_unet_model(
                     conditioning_input_shapes=self.conditioning_input_shapes,
@@ -124,6 +121,7 @@ class CVAE(object):
                     transform_activation=self.transform_activation,
                     clip_output_range=self.clip_output_range,
                     unet_nf_enc=self.dec_params['unet_nf_enc'] if 'unet_nf_enc' in self.dec_params else [64, 64, 64],
+                    do_concat='concat' in self.conditioning_type
             )
         else:
             self.transformer_model = \

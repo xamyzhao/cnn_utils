@@ -525,8 +525,7 @@ def _pad_or_crop_to_shape_3D(x, in_shape, tgt_shape):
     return x
 
 # wraps a unet2D and unet3D as a model for ease of visualization
-def unet_model(unet_fn, unet_input_shape=None, model_name=None, **kwargs,
-           ):
+def unet_model(unet_fn, unet_input_shape=None, model_name=None, **kwargs):
     if unet_input_shape is None:
         unet_input_shape = kwargs['input_shape']
     if model_name is None:

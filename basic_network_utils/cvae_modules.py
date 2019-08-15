@@ -138,9 +138,9 @@ def transform_encoder_model(input_shapes, input_names=None,
         img_shape=input_stack_shape,
         conv_chans=enc_params['nf_enc'],
         min_h=None, min_c=None,
-        n_convs_per_stage=enc_params['n_convs_per_stage'],
-        use_residuals=enc_params['use_residuals'],
-        use_maxpool=enc_params['use_maxpool'],
+        n_convs_per_stage=enc_params['n_convs_per_stage'] if 'n_convs_per_stage' in enc_params else 1,
+        use_residuals=enc_params['use_residuals'] if 'use_residuals' in enc_params else False,
+        use_maxpool=enc_params['use_maxpool'] if 'use_maxpool' in enc_params else False,
         prefix='vte'
     )
 
@@ -298,9 +298,9 @@ def nonconditional_decoder_model(output_shape,
         x_enc, output_shape,
         encoded_shape=reshape_encoding_to,
         prefix='vae_dec',
-        conv_chans=enc_params['nf_dec'], ks=enc_params['ks'],
-        n_convs_per_stage=enc_params['n_convs_per_stage'],
-        use_upsample=enc_params['use_upsample'],
+        conv_chans=enc_params['nf_dec'], ks=enc_params['ks'] if 'ks' in enc_params else 3,
+        n_convs_per_stage=enc_params['n_convs_per_stage'] if 'n_convs_per_stage' in enc_params else 1,
+        use_upsample=enc_params['use_upsample'] if 'use_upsample' in enc_params else False,
         include_skips=None,
         target_vol_sizes=None
     )
@@ -324,6 +324,8 @@ def transformer_unet_model(conditioning_input_shapes, conditioning_input_names=N
                              transform_activation=None, clip_output_range=None,
                              source_input_idx=None,
                              mask_by_conditioning_input_idx=None,
+                            do_concat=False,
+                           n_concat_scales=2,
                              ):
 
     # collect conditioning inputs, and concatentate them into a stack
@@ -372,6 +374,49 @@ def transformer_unet_model(conditioning_input_shapes, conditioning_input_names=N
         mask_shape = conditioning_input_shapes[mask_by_conditioning_input_idx]
         x_mask = conditioning_inputs[mask_by_conditioning_input_idx]
 
+    if do_concat:  # concat in addition to unet
+        # simply concatenate the conditioning stack (at various scales) with the decoder volumes
+        include_fullres = True
+
+        concat_decoder_outputs_with = [None] * len(enc_params['nf_dec'])
+        concat_skip_sizes = [None] * len(enc_params['nf_dec'])
+
+        # make sure x_I is the same shape as the output, including in the channels dimension
+        if not np.all(output_shape <= conditioning_input_shape):
+            tile_factor = [int(round(output_shape[i] / conditioning_input_shape[i])) for i in
+                           range(len(output_shape))]
+            print('Tile factor: {}'.format(tile_factor))
+            conditioning_input_stack = Lambda(lambda x: tf.tile(x, [1] + tile_factor), name='lambda_tile_cond_input')(
+                conditioning_input_stack)
+
+        # downscale the conditioning inputs by the specified number of times
+        xs_downscaled = [conditioning_input_stack]
+        for si in range(n_concat_scales):
+            curr_x_scaled = network_layers.Blur_Downsample(
+                n_chans=conditioning_input_shape[-1], n_dims=n_dims,
+                do_blur=True,
+                name='downsample_scale-1/{}'.format(2 ** (si + 1))
+            )(xs_downscaled[-1])
+            xs_downscaled.append(curr_x_scaled)
+
+        if not include_fullres:
+            xs_downscaled = xs_downscaled[1:]  # exclude the full-res volume
+
+        print('Including downsampled input sizes {}'.format([x.get_shape().as_list() for x in xs_downscaled]))
+
+        # the smallest decoder volume will be the same as the smallest encoder volume, so we need to make sure we match volume sizes appropriately
+        n_enc_scales = len(enc_params['nf_enc'])
+        n_ds = len(xs_downscaled)
+        concat_decoder_outputs_with[n_enc_scales - n_ds + 1:n_enc_scales] = list(reversed(xs_downscaled))
+        concat_skip_sizes[n_enc_scales - n_ds + 1:n_enc_scales] = list(reversed(
+            [np.asarray(x.get_shape().as_list()[1:-1]) for x in xs_downscaled if
+             x is not None]))
+    else:
+        # just ignore the conditioning input
+        concat_decoder_outputs_with = None
+        concat_skip_sizes = None
+
+
     if transform_type == 'flow':
         layer_prefix = 'flow'
     elif transform_type == 'color':
@@ -404,11 +449,12 @@ def transformer_unet_model(conditioning_input_shapes, conditioning_input_names=N
         x_enc, output_shape[:-1] + (enc_params['nf_dec'][-1],),
         encoded_shape=reshape_encoding_to,
         prefix='{}_dec'.format(layer_prefix),
-        conv_chans=enc_params['nf_dec'], ks=enc_params['ks'],
-        n_convs_per_stage=enc_params['n_convs_per_stage'],
-        use_upsample=enc_params['use_upsample'],
-        include_skips=None,
-        target_vol_sizes=None
+        conv_chans=enc_params['nf_dec'],
+        ks=enc_params['ks'] if 'ks' in enc_params else 3,
+        n_convs_per_stage=enc_params['n_convs_per_stage'] if 'n_convs_per_stage' in enc_params else 1,
+        use_upsample=enc_params['use_upsample'] if 'use_upsample' in enc_params else False,
+        include_skips=concat_decoder_outputs_with,
+        target_vol_sizes=concat_skip_sizes,
     )
 
 
@@ -595,9 +641,10 @@ def transformer_concat_model(conditioning_input_shapes, conditioning_input_names
         x_enc, output_shape,
         encoded_shape=reshape_encoding_to,
         prefix='{}_dec'.format(layer_prefix),
-        conv_chans=enc_params['nf_dec'], ks=enc_params['ks'],
-        n_convs_per_stage=enc_params['n_convs_per_stage'],
-        use_upsample=enc_params['use_upsample'],
+        conv_chans=enc_params['nf_dec'],
+        ks=enc_params['ks'] if 'ks' in enc_params else 3,
+        n_convs_per_stage=enc_params['n_convs_per_stage'] if 'n_convs_per_stage' in enc_params else 1,
+        use_upsample=enc_params['use_upsample'] if 'use_upsample' in enc_params else False,
         include_skips=concat_decoder_outputs_with,
         target_vol_sizes=concat_skip_sizes
     )
