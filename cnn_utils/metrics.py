@@ -135,7 +135,7 @@ def vgg_preprocess_norm(arg):
 
 from keras.applications.vgg16 import VGG16
 from keras.applications.vgg19 import VGG19
-from keras.layers import AveragePooling2D, Conv2D, Input
+from keras.layers import AveragePooling2D, Conv2D, Input, MaxPooling2D
 from keras.models import Model, load_model
 def vgg_isola_norm(shape=(64,64,3), normalized_inputs=False):
     img_input = Input(shape=shape)
@@ -156,103 +156,78 @@ def vgg_isola_norm(shape=(64,64,3), normalized_inputs=False):
                 'vgg_preprocess_norm': vgg_preprocess_norm, 
                 'vgg_preprocess': vgg_preprocess})
     
-# Block 1
-    x = layers.Conv2D(64, (3, 3),
+    # Block 1
+    x1 = Conv2D(64, (3, 3),
                       activation='relu',
                       padding='same',
                       name='block1_conv1')(img_input)
-    x = layers.Conv2D(64, (3, 3),
+    x2 = Conv2D(64, (3, 3),
                       activation='relu',
                       padding='same',
-                      name='block1_conv2')(x)
-    x = layers.MaxPooling2D((2, 2), strides=(2, 2), name='block1_pool')(x)
+                      name='block1_conv2')(x1) # relu is layer 4 in torch implementation
+    x3 = MaxPooling2D((2, 2), strides=(2, 2), name='block1_pool')(x2)
 
     # Block 2
-    x = layers.Conv2D(128, (3, 3),
+    x4 = Conv2D(128, (3, 3),
                       activation='relu',
                       padding='same',
-                      name='block2_conv1')(x)
-    x = layers.Conv2D(128, (3, 3),
+                      name='block2_conv1')(x3)
+    x5 = Conv2D(128, (3, 3),
                       activation='relu',
                       padding='same',
-                      name='block2_conv2')(x)
-    x = layers.MaxPooling2D((2, 2), strides=(2, 2), name='block2_pool')(x)
+                      name='block2_conv2')(x4) # relu is layer 9
+    x6 = MaxPooling2D((2, 2), strides=(2, 2), name='block2_pool')(x5)
 
     # Block 3
-    x = layers.Conv2D(256, (3, 3),
+    x7 = Conv2D(256, (3, 3),
                       activation='relu',
                       padding='same',
-                      name='block3_conv1')(x)
-    x = layers.Conv2D(256, (3, 3),
+                      name='block3_conv1')(x6)
+    x8 = Conv2D(256, (3, 3),
                       activation='relu',
                       padding='same',
-                      name='block3_conv2')(x)
-    x = layers.Conv2D(256, (3, 3),
+                      name='block3_conv2')(x7)
+    x9 = Conv2D(256, (3, 3),
                       activation='relu',
                       padding='same',
-                      name='block3_conv3')(x)
-    x = layers.MaxPooling2D((2, 2), strides=(2, 2), name='block3_pool')(x)
+                      name='block3_conv3')(x8) # relu is layer 16
+    x10 = MaxPooling2D((2, 2), strides=(2, 2), name='block3_pool')(x9)
 
     # Block 4
-    x = layers.Conv2D(512, (3, 3),
+    x11 = Conv2D(512, (3, 3),
                       activation='relu',
                       padding='same',
-                      name='block4_conv1')(x)
-    x = layers.Conv2D(512, (3, 3),
+                      name='block4_conv1')(x10)
+    x12 = Conv2D(512, (3, 3),
                       activation='relu',
                       padding='same',
-                      name='block4_conv2')(x)
-    x = layers.Conv2D(512, (3, 3),
+                      name='block4_conv2')(x11)
+    x13 = Conv2D(512, (3, 3),
                       activation='relu',
                       padding='same',
-                      name='block4_conv3')(x)
-    x = layers.MaxPooling2D((2, 2), strides=(2, 2), name='block4_pool')(x)
+                      name='block4_conv3')(x12) # relu is layer 23 in torch
+    x14 = MaxPooling2D((2, 2), strides=(2, 2), name='block4_pool')(x13)
 
     # Block 5
-    x = layers.Conv2D(512, (3, 3),
+    x15 = Conv2D(512, (3, 3),
                       activation='relu',
                       padding='same',
-                      name='block5_conv1')(x)
-    x = layers.Conv2D(512, (3, 3),
+                      name='block5_conv1')(x14)
+    x16 = Conv2D(512, (3, 3),
                       activation='relu',
                       padding='same',
-                      name='block5_conv2')(x)
-    x = layers.Conv2D(512, (3, 3),
+                      name='block5_conv2')(x15)
+    x17 = Conv2D(512, (3, 3),
                       activation='relu',
                       padding='same',
-                      name='block5_conv3')(x)
-    x = layers.MaxPooling2D((2, 2), strides=(2, 2), name='block5_pool')(x)
+                      name='block5_conv3')(x16) # relu is layer 30
+
     #img = Lambda(lambda arg:vgg_preprocess(arg, normalized=normalized_inputs),
     #    name='lambda_preproc_norm{}'.format(normalized_inputs))(img_input)
 
-    x1 = Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv1')(img)
-    x2 = Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv2')(x1)
-    x3 = AveragePooling2D((2, 2), name='block1_pool')(x2)
-
-    x4 = Conv2D(128, (3, 3), activation='relu', padding='same', name='block2_conv1')(x3)
-    x5 = Conv2D(128, (3, 3), activation='relu', padding='same', name='block2_conv2')(x4)
-    x6 = AveragePooling2D((2, 2), name='block2_pool')(x5)
-
-    x7 = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv1')(x6)
-    x8 = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv2')(x7)
-    x9 = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv3')(x8)
-    x10 = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv4')(x9)
-    x11 = AveragePooling2D((2, 2), name='block3_pool')(x10)
-
-    x12 = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv1')(x11)
-    x13 = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv2')(x12)
-    x14 = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv3')(x13)
-    x15 = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv4')(x14)
-    x16 = AveragePooling2D((2, 2), name='block4_pool')(x15)
-
-    x17 = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv1')(x16)
-    x18 = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv2')(x17)
-    x19 = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv3')(x18)
-    x20 = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv4')(x19)
-    x21 = AveragePooling2D((2, 2), name='block5_pool')(x20)
-
-    model = Model(inputs=[img_input], outputs=[x2, x5, x9, x14, x19])
-    model_orig = VGG19(weights='imagenet', input_shape=shape, include_top=False)
+    # isola implementation uses layer outputs 4, 9, 16, 23, 30, but need to count activations
+    model = Model(inputs=[img_input], outputs=[x2, x5, x9, x13, x17])
+    model_orig = VGG16(weights='imagenet', input_shape=shape, include_top=False)
 
     # ignore the lambda we put in for preprocessing
     vgg_layers = [l for l in model.layers if not isinstance(l, Lambda)]
