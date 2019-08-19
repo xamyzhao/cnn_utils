@@ -9,6 +9,71 @@ import numpy as np
 import tensorflow as tf
 from scipy.signal import convolve2d
 
+class NCC():
+    """
+    local (over window) normalized cross correlation
+    """
+
+    def __init__(self, win=None, eps=1e-2, n_chans=3):
+        # IMPORTANT: a higher eps (1e-2) makes training more stable
+        self.win = win
+        self.eps = eps
+        self.n_chans = n_chans
+
+    def ncc(self, I, J):
+        # get dimension of volume
+        # assumes I, J are sized [batch_size, *vol_shape, nb_feats]
+        ndims = len(I.get_shape().as_list()) - 2
+        assert ndims in [1, 2, 3], "volumes should be 1 to 3 dimensions. found: %d" % ndims
+
+        I_chans = tf.split(I, self.n_chans, axis=-1)
+        J_chans = tf.split(J, self.n_chans, axis=-1)
+
+        # set window size
+        if self.win is None:
+            self.win = [9] * ndims
+        # compute cross correlation
+        win_size = float(np.prod(self.win))
+
+        # get convolution function
+        conv_fn = getattr(tf.nn, 'conv%dd' % ndims)
+
+        total_cc = 0.
+        for c in range(self.n_chans):
+            I_chan = I_chans[c]
+            J_chan = J_chans[c]
+
+            # compute CC squares
+            I2 = I_chan * I_chan
+            J2 = J_chan * J_chan
+            IJ = I_chan * J_chan
+
+            # compute filters
+            sum_filt = tf.ones([*self.win, 1, 1])
+            strides = [1] * (ndims + 2)
+            padding = 'VALID'
+
+            # compute local sums via convolution
+            I_sum = conv_fn(I_chan, sum_filt, strides, padding)
+            J_sum = conv_fn(J_chan, sum_filt, strides, padding)
+            I2_sum = conv_fn(I2, sum_filt, strides, padding)
+            J2_sum = conv_fn(J2, sum_filt, strides, padding)
+            IJ_sum = conv_fn(IJ, sum_filt, strides, padding)
+
+            u_I = I_sum / win_size
+            u_J = J_sum / win_size
+
+            cross = IJ_sum - u_J * I_sum - u_I * J_sum + u_I * u_J * win_size
+            I_var = I2_sum - 2 * u_I * I_sum + u_I * u_I * win_size
+            J_var = J2_sum - 2 * u_J * J_sum + u_J * u_J * win_size
+
+            cc = cross * cross / (I_var * J_var + self.eps)
+            total_cc += tf.reduce_mean(cc)
+        # return negative cc.
+        return total_cc / float(self.n_chans)
+
+    def loss(self, I, J):
+        return -self.ncc(I, J)
 
 class AreaDistributionLoss(object):
     def __init__(self, ratio_mu, ratio_sigma, delta_thresh, n_frame_chans=3):
@@ -68,9 +133,141 @@ def vgg_preprocess_norm(arg):
     r = z[:, :, :, 2] - 123.68
     return tf.stack([b, g, r], axis=3)
 
+from keras.applications.vgg16 import VGG16
 from keras.applications.vgg19 import VGG19
 from keras.layers import AveragePooling2D, Conv2D, Input
 from keras.models import Model, load_model
+def vgg_isola_norm(shape=(64,64,3), normalized_inputs=False):
+    img_input = Input(shape=shape)
+
+    if normalized_inputs:
+        vgg_model_file = '../evolving_wilds/cnn_utils/vgg16_normtanh_ims{}-{}.h5'.format(shape[0], shape[1])
+        img = Lambda(vgg_preprocess_norm,
+            name='lambda_preproc_norm-11')(img_input)
+    else:
+        vgg_model_file = '../evolving_wilds/cnn_utils/vgg16_01_ims{}-{}.h5'.format(shape[0], shape[1])
+        img = Lambda(vgg_preprocess,
+            name='lambda_preproc_clip01')(img_input)
+
+    if os.path.isfile(vgg_model_file):
+        print('Loading vgg model from {}'.format(vgg_model_file))
+        return load_model(vgg_model_file,
+            custom_objects={
+                'vgg_preprocess_norm': vgg_preprocess_norm, 
+                'vgg_preprocess': vgg_preprocess})
+    
+# Block 1
+    x = layers.Conv2D(64, (3, 3),
+                      activation='relu',
+                      padding='same',
+                      name='block1_conv1')(img_input)
+    x = layers.Conv2D(64, (3, 3),
+                      activation='relu',
+                      padding='same',
+                      name='block1_conv2')(x)
+    x = layers.MaxPooling2D((2, 2), strides=(2, 2), name='block1_pool')(x)
+
+    # Block 2
+    x = layers.Conv2D(128, (3, 3),
+                      activation='relu',
+                      padding='same',
+                      name='block2_conv1')(x)
+    x = layers.Conv2D(128, (3, 3),
+                      activation='relu',
+                      padding='same',
+                      name='block2_conv2')(x)
+    x = layers.MaxPooling2D((2, 2), strides=(2, 2), name='block2_pool')(x)
+
+    # Block 3
+    x = layers.Conv2D(256, (3, 3),
+                      activation='relu',
+                      padding='same',
+                      name='block3_conv1')(x)
+    x = layers.Conv2D(256, (3, 3),
+                      activation='relu',
+                      padding='same',
+                      name='block3_conv2')(x)
+    x = layers.Conv2D(256, (3, 3),
+                      activation='relu',
+                      padding='same',
+                      name='block3_conv3')(x)
+    x = layers.MaxPooling2D((2, 2), strides=(2, 2), name='block3_pool')(x)
+
+    # Block 4
+    x = layers.Conv2D(512, (3, 3),
+                      activation='relu',
+                      padding='same',
+                      name='block4_conv1')(x)
+    x = layers.Conv2D(512, (3, 3),
+                      activation='relu',
+                      padding='same',
+                      name='block4_conv2')(x)
+    x = layers.Conv2D(512, (3, 3),
+                      activation='relu',
+                      padding='same',
+                      name='block4_conv3')(x)
+    x = layers.MaxPooling2D((2, 2), strides=(2, 2), name='block4_pool')(x)
+
+    # Block 5
+    x = layers.Conv2D(512, (3, 3),
+                      activation='relu',
+                      padding='same',
+                      name='block5_conv1')(x)
+    x = layers.Conv2D(512, (3, 3),
+                      activation='relu',
+                      padding='same',
+                      name='block5_conv2')(x)
+    x = layers.Conv2D(512, (3, 3),
+                      activation='relu',
+                      padding='same',
+                      name='block5_conv3')(x)
+    x = layers.MaxPooling2D((2, 2), strides=(2, 2), name='block5_pool')(x)
+    #img = Lambda(lambda arg:vgg_preprocess(arg, normalized=normalized_inputs),
+    #    name='lambda_preproc_norm{}'.format(normalized_inputs))(img_input)
+
+    x1 = Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv1')(img)
+    x2 = Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv2')(x1)
+    x3 = AveragePooling2D((2, 2), name='block1_pool')(x2)
+
+    x4 = Conv2D(128, (3, 3), activation='relu', padding='same', name='block2_conv1')(x3)
+    x5 = Conv2D(128, (3, 3), activation='relu', padding='same', name='block2_conv2')(x4)
+    x6 = AveragePooling2D((2, 2), name='block2_pool')(x5)
+
+    x7 = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv1')(x6)
+    x8 = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv2')(x7)
+    x9 = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv3')(x8)
+    x10 = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv4')(x9)
+    x11 = AveragePooling2D((2, 2), name='block3_pool')(x10)
+
+    x12 = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv1')(x11)
+    x13 = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv2')(x12)
+    x14 = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv3')(x13)
+    x15 = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv4')(x14)
+    x16 = AveragePooling2D((2, 2), name='block4_pool')(x15)
+
+    x17 = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv1')(x16)
+    x18 = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv2')(x17)
+    x19 = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv3')(x18)
+    x20 = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv4')(x19)
+    x21 = AveragePooling2D((2, 2), name='block5_pool')(x20)
+
+    model = Model(inputs=[img_input], outputs=[x2, x5, x9, x14, x19])
+    model_orig = VGG19(weights='imagenet', input_shape=shape, include_top=False)
+
+    # ignore the lambda we put in for preprocessing
+    vgg_layers = [l for l in model.layers if not isinstance(l, Lambda)]
+    for li, l in enumerate(vgg_layers):
+        weights = model_orig.layers[li].get_weights()
+        l.set_weights(weights)
+        print('Copying imagenet weights for layer {}: {}'.format(li, l.name))
+        l.trainable = False
+
+    if not os.path.isfile(vgg_model_file):
+        model.save(vgg_model_file)
+
+    return model
+
+
 
 def vgg_norm(shape=(64,64,3), normalized_inputs=False):
     img_input = Input(shape=shape)
@@ -935,6 +1132,7 @@ class laplacian_reg(object):
         self.laplacian_filter = tf.expand_dims(tf.expand_dims(laplacian_filter, -1), -1)
 
     def compute_laplacian_l2(self, y_true, y_pred):
+        # roll any dims after 3 into the channels dimension
         y_pred = tf.reshape(y_pred, [tf.shape(y_pred)[0], tf.shape(y_pred)[1], tf.shape(y_pred)[2], -1])
         pred_perchan = tf.unstack(y_pred, num=self.n_chans, axis=-1)
         loss = 0.

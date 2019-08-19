@@ -6,6 +6,7 @@ import numpy as np
 
 
 def filenames_to_im_ids(im_files):
+    im_files = [os.path.basename(os.path.splitext(f)[0]) for f in im_files]
     if isinstance(im_files[0], int):
         return im_files
     elif 'frame_' in im_files[0]:
@@ -14,10 +15,10 @@ def filenames_to_im_ids(im_files):
     elif 'frame' in im_files[0]:
         im_file_ids = [int(re.search('(?<=frame)[0-9]*', os.path.basename(f)).group(0)) for f in im_files]
         return im_file_ids
+
     try:
         int(im_files[0])
         im_file_ids = [ int( os.path.splitext(os.path.basename(f))[0] ) for f in im_files ]
-    
     except ValueError:
         '''
         # just return these as strings? not sure why i wanted to do the conversion
