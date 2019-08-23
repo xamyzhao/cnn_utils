@@ -52,22 +52,27 @@ def autoencoder(img_shape, latent_dim=10,
                      name=name_prefix + '_autoencoder')
 
 
-def myConv(nf, n_dims, prefix=None, suffix=None, ks=3, strides=1, initializer=None):
-    if initializer is None:
-        initializer = 'glorot_uniform' # keras default for conv kernels
+def myConv(nf, n_dims, prefix=None, suffix=None, ks=3, strides=1,
+           kernel_initializer=None, bias_initializer=None):
+    if kernel_initializer is None:
+        kernel_initializer = 'glorot_uniform' # keras default for conv kernels
+    if bias_initializer is None:
+        bias_initializer = 'zeros' # default for keras conv
 
     # wrapper for 2D and 3D conv
     if n_dims == 2:
         if not isinstance(strides, tuple):
             strides = (strides, strides)
-        return Conv2D(nf, kernel_size=ks, padding='same', strides=strides, kernel_initializer=initializer,
+        return Conv2D(nf, kernel_size=ks, padding='same', strides=strides,
+                      kernel_initializer=kernel_initializer, bias_initializer=bias_initializer,
                       name='_'.join([
                           str(part) for part in [prefix, 'conv2D', suffix]  # include prefix and suffix if they exist
                           if part is not None and len(str(part)) > 0]))
     elif n_dims == 3:
         if not isinstance(strides, tuple):
             strides = (strides, strides, strides)
-        return Conv3D(nf, kernel_size=ks, padding='same', strides=strides, kernel_initializer=initializer,
+        return Conv3D(nf, kernel_size=ks, padding='same', strides=strides,
+                      kernel_initializer=kernel_initializer, bias_initializer=bias_initializer,
                       name='_'.join([
                           str(part) for part in [prefix, 'conv3D', suffix]  # include prefix and suffix if they exist
                           if part is not None and len(str(part)) > 0]))
@@ -98,7 +103,8 @@ def encoder(x, img_shape,
             min_h=5, min_c=None,
             prefix='',
             ks=3,
-            return_skips=False, use_residuals=False, use_maxpool=False, use_batchnorm=False, initializer=None):
+            return_skips=False, use_residuals=False, use_maxpool=False, use_batchnorm=False,
+            kernel_initializer=None, bias_initializer=None):
     skip_layers = []
     concat_skip_sizes = []
     n_dims = len(img_shape) - 1  # assume img_shape includes spatial dims, followed by channels
@@ -121,7 +127,8 @@ def encoder(x, img_shape,
     for i in range(len(conv_chans)):
         #if n_convs_per_stage is not None and n_convs_per_stage > 1 or use_maxpool and n_convs_per_stage is not None:
         for ci in range(n_convs_per_stage):
-            x = myConv(nf=conv_chans[i], ks=ks[i], strides=1, n_dims=n_dims, initializer=initializer,
+            x = myConv(nf=conv_chans[i], ks=ks[i], strides=1, n_dims=n_dims,
+                       kernel_initializer=kernel_initializer, bias_initializer=bias_initializer,
                        prefix='{}_enc'.format(prefix),
                        suffix='{}_{}'.format(i, ci + 1))(x)
 
@@ -143,6 +150,7 @@ def encoder(x, img_shape,
             x = myPool(n_dims=n_dims, prefix=prefix, suffix=i)(x)
         else:
             x = myConv(conv_chans[i], ks=ks[i], strides=2, n_dims=n_dims,
+                       kernel_initializer=kernel_initializer, bias_initializer=bias_initializer,
                        prefix='{}_enc'.format(prefix), suffix=i)(x)
 
             # don't activate right after a maxpool, it makes no sense
@@ -155,6 +163,7 @@ def encoder(x, img_shape,
             for ci in range(n_convs_per_stage):
                 # TODO: we might not have enough ks for this
                 x = myConv(min_c, ks=ks[-1], n_dims=n_dims, strides=1,
+                           kernel_initializer=kernel_initializer, bias_initializer=bias_initializer,
                            prefix='{}_enc'.format(prefix), suffix='last_{}'.format(ci + 1))(x)
 
                 if ci == 0 and use_residuals:
@@ -164,6 +173,7 @@ def encoder(x, img_shape,
                 x = LeakyReLU(0.2, name='{}_enc_leakyrelu_last'.format(prefix))(x)
 
         x = myConv(min_c, ks=ks[-1], strides=1, n_dims=n_dims,
+                   kernel_initializer=kernel_initializer, bias_initializer=bias_initializer,
                    prefix='{}_enc'.format(prefix),
                    suffix='_last')(x)
 
@@ -284,12 +294,19 @@ def encoder3D(x, img_shape,
     else:
         return x
 
-def myConvTranspose(nf, n_dims, prefix=None, suffix=None, ks=3, strides=1):
+def myConvTranspose(nf, n_dims, prefix=None, suffix=None, ks=3, strides=1, 
+                    kernel_initializer=None, bias_initializer=None):
+    if kernel_initializer is None:
+        kernel_initializer = 'glorot_uniform' # keras default for conv kernels
+    if bias_initializer is None:
+        bias_initializer = 'zeros' # default for keras conv
     # wrapper for 2D and 3D conv
     if n_dims == 2:
         if not isinstance(strides, tuple):
             strides = (strides, strides)
         return Conv2DTranspose(nf, kernel_size=ks, padding='same', strides=strides,
+                               kernel_initializer=kernel_initializer,
+                               bias_initializer=bias_initializer,
                       name='_'.join([
                           str(part) for part in [prefix, 'conv2Dtrans', suffix]  # include prefix and suffix if they exist
                           if part is not None and len(str(part)) > 0]))
@@ -297,6 +314,8 @@ def myConvTranspose(nf, n_dims, prefix=None, suffix=None, ks=3, strides=1):
         if not isinstance(strides, tuple):
             strides = (strides, strides, strides)
         return Conv3DTranspose(nf, kernel_size=ks, padding='same', strides=strides,
+                               kernel_initializer=kernel_initializer,
+                               bias_initializer=bias_initializer,
                       name='_'.join([
                           str(part) for part in [prefix, 'conv3Dtrans', suffix]  # include prefix and suffix if they exist
                           if part is not None and len(str(part)) > 0]))
@@ -335,6 +354,7 @@ def decoder(x,
             use_batchnorm=False,
             target_vol_sizes=None,
             n_samples=1,
+            kernel_initializer=None, bias_initializer=None,
             ):
     n_dims = len(output_shape) - 1
     if conv_chans is None:
@@ -426,7 +446,9 @@ def decoder(x,
                        strides=1,
                        n_dims=n_dims,
                        prefix=prefix,
-                       suffix='{}_{}'.format(i, ci + 1))(x)
+                       suffix='{}_{}'.format(i, ci + 1),
+                       kernel_initializer=kernel_initializer, bias_initializer=bias_initializer,
+                       )(x)
             if use_batchnorm: # TODO: check to see if this should go before the residual
                 x = BatchNormalization()(x)
             # if we want residuals, store them here
@@ -447,6 +469,7 @@ def decoder(x,
                 x = myConvTranspose(conv_chans[i], n_dims=n_dims,
                                     ks=ks[i], strides=2,
                                     prefix=prefix, suffix=i,
+                                    kernel_initializer=kernel_initializer, bias_initializer=bias_initializer,
                                     )(x)
                 if use_batchnorm:
                     x = BatchNormalization()(x)
@@ -460,6 +483,7 @@ def decoder(x,
                strides=1,
                prefix=prefix,
                suffix='final',
+               kernel_initializer=kernel_initializer, bias_initializer=bias_initializer,
                )(x)
 
     return x
