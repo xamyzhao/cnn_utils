@@ -248,8 +248,10 @@ def gen_batch(ims_data, labels_data,
             yield tuple(ims_batches) + tuple(labels_batches) + (out_aug_params, )
         elif yield_idxs:
             yield tuple(ims_batches) + tuple(labels_batches) + (idxs, )
-        else:
+        elif labels_data is not None:
             yield tuple(ims_batches) + tuple(labels_batches)
+        else:
+            yield tuple(ims_batches) + (None,)
 
 
 def _test_gen_batch():

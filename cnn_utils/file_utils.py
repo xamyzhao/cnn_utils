@@ -6,7 +6,7 @@ import numpy as np
 
 
 def filenames_to_im_ids(im_files):
-    im_files = [os.path.basename(os.path.splitext(f)[0]) for f in im_files]
+    im_files = [os.path.basename(f) for f in im_files]
     if isinstance(im_files[0], int):
         return im_files
     elif 'frame_' in im_files[0]:

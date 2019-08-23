@@ -158,9 +158,6 @@ def run_experiment(exp, run_args,
     return exp_dir
 
 
-
-
-
 def train_using_fit_generator(
         exp, batch_size,
         start_epoch, end_epoch,

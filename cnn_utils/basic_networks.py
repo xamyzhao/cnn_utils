@@ -52,19 +52,22 @@ def autoencoder(img_shape, latent_dim=10,
                      name=name_prefix + '_autoencoder')
 
 
-def myConv(nf, n_dims, prefix=None, suffix=None, ks=3, strides=1):
+def myConv(nf, n_dims, prefix=None, suffix=None, ks=3, strides=1, initializer=None):
+    if initializer is None:
+        initializer = 'glorot_uniform' # keras default for conv kernels
+
     # wrapper for 2D and 3D conv
     if n_dims == 2:
         if not isinstance(strides, tuple):
             strides = (strides, strides)
-        return Conv2D(nf, kernel_size=ks, padding='same', strides=strides,
+        return Conv2D(nf, kernel_size=ks, padding='same', strides=strides, kernel_initializer=initializer,
                       name='_'.join([
                           str(part) for part in [prefix, 'conv2D', suffix]  # include prefix and suffix if they exist
                           if part is not None and len(str(part)) > 0]))
     elif n_dims == 3:
         if not isinstance(strides, tuple):
             strides = (strides, strides, strides)
-        return Conv3D(nf, kernel_size=ks, padding='same', strides=strides,
+        return Conv3D(nf, kernel_size=ks, padding='same', strides=strides, kernel_initializer=initializer,
                       name='_'.join([
                           str(part) for part in [prefix, 'conv3D', suffix]  # include prefix and suffix if they exist
                           if part is not None and len(str(part)) > 0]))
@@ -95,7 +98,7 @@ def encoder(x, img_shape,
             min_h=5, min_c=None,
             prefix='',
             ks=3,
-            return_skips=False, use_residuals=False, use_maxpool=False, use_batchnorm=False):
+            return_skips=False, use_residuals=False, use_maxpool=False, use_batchnorm=False, initializer=None):
     skip_layers = []
     concat_skip_sizes = []
     n_dims = len(img_shape) - 1  # assume img_shape includes spatial dims, followed by channels
@@ -118,7 +121,7 @@ def encoder(x, img_shape,
     for i in range(len(conv_chans)):
         #if n_convs_per_stage is not None and n_convs_per_stage > 1 or use_maxpool and n_convs_per_stage is not None:
         for ci in range(n_convs_per_stage):
-            x = myConv(nf=conv_chans[i], ks=ks[i], strides=1, n_dims=n_dims,
+            x = myConv(nf=conv_chans[i], ks=ks[i], strides=1, n_dims=n_dims, initializer=initializer,
                        prefix='{}_enc'.format(prefix),
                        suffix='{}_{}'.format(i, ci + 1))(x)
 
@@ -329,6 +332,7 @@ def decoder(x,
             include_skips=None,
             use_residuals=False,
             use_upsample=False,
+            use_batchnorm=False,
             target_vol_sizes=None,
             n_samples=1,
             ):
@@ -423,6 +427,8 @@ def decoder(x,
                        n_dims=n_dims,
                        prefix=prefix,
                        suffix='{}_{}'.format(i, ci + 1))(x)
+            if use_batchnorm: # TODO: check to see if this should go before the residual
+                x = BatchNormalization()(x)
             # if we want residuals, store them here
             if ci == 0 and use_residuals:
                 residual_input = x
@@ -442,6 +448,8 @@ def decoder(x,
                                     ks=ks[i], strides=2,
                                     prefix=prefix, suffix=i,
                                     )(x)
+                if use_batchnorm:
+                    x = BatchNormalization()(x)
                 x = LeakyReLU(0.2, name='{}_leakyrelu_{}'.format(prefix, i))(x)  # changed 5/15/2018, will break old models
             else:
                 x = myUpsample(size=2, n_dims=n_dims, prefix=prefix, suffix=i)(x)

@@ -1201,28 +1201,28 @@ class CriticScore(object):
     # WGAN loss
     def __init__(self, critic_model, loss_fn=None, target_score=None):
         self.critic_model = critic_model
-        self.loss_fn = loss_fn
-        self.target_score = target_score
-        
-    def compute_loss(self, y_true, y_pred):
         self.critic_model.trainable = False
         for l in self.critic_model.layers:
             l.trainable = False
 
+        self.loss_fn = loss_fn
+        self.target_score = target_score
+        
+    def compute_loss(self, y_true, y_pred):
         critic_score = self.critic_model(y_pred)
 
         if self.loss_fn is None:
-            return 0. - tf.reduce_mean(critic_score)
+            return -tf.reduce_mean(critic_score)
         elif self.loss_fn is not None and self.target_score is not None:
             return self.loss_fn(self.target_score, critic_score)
         elif self.loss_fn is not None and self.target_score is None:
             return self.loss_fn(y_true, critic_score)
 
 def neg_mean_loss(y_true, y_pred):
-    return -K.mean(y_pred)
+    return -tf.reduce_mean(y_pred)
 
 def mean_loss(y_true, y_pred):
-    return K.mean(y_pred)
+    return tf.reduce_mean(y_pred)
 
 def mean_diff(y_true, y_pred):
     return K.mean(y_pred - y_true)
