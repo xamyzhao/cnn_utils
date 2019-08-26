@@ -141,6 +141,8 @@ def transform_encoder_model(input_shapes, input_names=None,
         n_convs_per_stage=enc_params['n_convs_per_stage'] if 'n_convs_per_stage' in enc_params else 1,
         use_residuals=enc_params['use_residuals'] if 'use_residuals' in enc_params else False,
         use_maxpool=enc_params['use_maxpool'] if 'use_maxpool' in enc_params else False,
+        kernel_initializer=enc_params['kernel_initializer'] if 'kernel_initializer' in enc_params else None,
+        bias_initializer=enc_params['bias_initializer'] if 'bias_initializer' in enc_params else None,
         prefix='vte'
     )
 
