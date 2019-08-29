@@ -207,7 +207,7 @@ class Experiment(object):
                 self.logger.addHandler(lfh)
 
             self.logger.addHandler(lsh)
-
+            self._print = self.logger.debug
 
         if self.do_profile and self.do_logging:
             formatter = logging.Formatter('[%(asctime)s] %(message)s', "%Y-%m-%d %H:%M:%S")
