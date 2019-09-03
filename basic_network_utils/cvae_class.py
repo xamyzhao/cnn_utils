@@ -153,6 +153,8 @@ class CVAE(object):
             dec_model=self.transformer_model,
             latent_shape=self.transform_latent_shape,
         )
+
+        self.sampling_model = self.tester_model
         '''
         else:
             self.trainer_model = \
@@ -174,6 +176,15 @@ class CVAE(object):
             var_target=1.,
             mu_target=0.,
             axis=-1)
+
+    def _create_sampling_model(self, n_outputs): # not exactly a tester model, but used to train in sampling mode
+        self.sampling_model = cvae_modules.cvae_tester_wrapper(
+            conditioning_input_shapes=self.conditioning_input_shapes,
+            conditioning_input_names=self.conditioning_input_names,
+            dec_model=self.transformer_model,
+            latent_shape=self.transform_latent_shape,
+            n_outputs=n_outputs
+        )
 
     def get_models(self):
         return [self.transform_enc_model, self.transformer_model]

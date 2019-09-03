@@ -816,6 +816,7 @@ def cvae_tester_wrapper(
         conditioning_input_shapes, conditioning_input_names,
         latent_shape,
         dec_model,
+        n_outputs=1,
 
 ):
     # collect conditioning inputs, and concatentate them into a stack
@@ -835,7 +836,10 @@ def cvae_tester_wrapper(
                         name='lambda_z_sampling_stdnormal'
                         )(z_dummy_input)
     y = dec_model(conditioning_inputs + [z_samp])
-    return Model(inputs=conditioning_inputs + [z_dummy_input], outputs=y, name='cvae_tester_model')
+    if isinstance(y, list): # multiple outputs, assume the first is the actual transformed frame
+        y = y[0]
+
+    return Model(inputs=conditioning_inputs + [z_dummy_input], outputs=[y] * n_outputs, name='cvae_tester_model')
 
 
 def _collect_inputs(ae_input_shapes, ae_input_names,
