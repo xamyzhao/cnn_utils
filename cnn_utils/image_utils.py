@@ -2,9 +2,6 @@ import math
 
 import cv2
 import numpy as np
-from scipy.ndimage import morphology as spndm
-import scipy.interpolate as spi
-
 
 def pad_or_crop_to_shape(
         I,
@@ -89,6 +86,7 @@ def seg_to_bounds(seg, delete_bound=5, save_raw_bounds_to_file=None, dilate_size
 
 
 def get_segmentation_mask(I, mask_color=(1., 1., 1.)):
+    from scipy.ndimage import morphology as spndm
     channel_masks = I.copy()
     for c in range(3):
         channel_masks[:, :, c] = (I[:, :, c] == mask_color[c]).astype(int)
