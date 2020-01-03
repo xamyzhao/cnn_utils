@@ -15,6 +15,14 @@ def filenames_to_im_ids(im_files):
     elif 'frame' in im_files[0]:
         im_file_ids = [int(re.search('(?<=frame)[0-9]*', os.path.basename(f)).group(0)) for f in im_files]
         return im_file_ids
+    elif isinstance(im_files[0], str) and '_' in im_files[0]:
+        # look at the start and end of the file name
+        try:
+            im_file_ids = [int(re.search('(?<=_)[0-9]*', os.path.basename(f)).group(0)) for f in im_files]
+        except:
+            im_file_ids = [int(re.search('[0-9]*(?=_)', os.path.basename(f)).group(0)) for f in im_files]
+        return im_file_ids
+        
 
     try:
         int(im_files[0])

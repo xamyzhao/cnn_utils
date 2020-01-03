@@ -563,7 +563,7 @@ def unet_model(unet_fn, unet_input_shape=None, model_name=None, **kwargs):
     if model_name is None:
         model_name = kwargs['layer_prefix']
     unet_input = Input(unet_input_shape, name='unet_input')
-    out = unet_fn(unet_input, **kwargs)
+    out = unet_fn(unet_input, input_shape=unet_input_shape, **kwargs)
     return Model(inputs=unet_input, outputs=out, name=model_name)
 
 def unet2D(x_in,

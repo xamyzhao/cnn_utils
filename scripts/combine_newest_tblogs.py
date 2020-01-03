@@ -10,7 +10,8 @@ import numpy as np
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     ap.add_argument('-model_names', nargs='*', default=[], type=str, help='Model names to associate with latest dirs')
-    ap.add_argument('-filter', nargs='*', default=[], type=str, help='List of terms to filter (AND) for')
+    ap.add_argument('-fa', '--filter_and', nargs='*', default=[], type=str, help='List of terms to filter (AND) for')
+    ap.add_argument('-fo', '--filter_or', nargs='*', default=[], type=str, help='List of terms to filter (OR) for')
     ap.add_argument('-port', nargs='?',type=int, help='port number', default=None)
     ap.add_argument('min_h',type=float,default=24, nargs='?')
     ap.add_argument('-repeat_every',type=float,default=60, nargs='?')
@@ -37,8 +38,11 @@ if __name__ == '__main__':
 
     latest_dirs = [d[2:] for i,d in enumerate(sorted_dirs) if hours_since[i] < args.min_h ] #remove leading ./
 
-    if len(args.filter) > 0:
-        latest_dirs = [ d for d in latest_dirs if np.all( [ft in d for ft in args.filter] )]
+    if len(args.filter_or) > 0:
+        latest_dirs = [d for d in latest_dirs if np.any([ft in d for ft in args.filter_or])]
+
+    if len(args.filter_and) > 0:
+        latest_dirs = [ d for d in latest_dirs if np.all( [ft in d for ft in args.filter_and] )]
     if len(args.model_names) == 0:
         model_names = [ os.path.basename( os.path.split( ld )[0] ) for ld in latest_dirs ]
     else:

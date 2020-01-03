@@ -94,7 +94,7 @@ class Experiment(object):
             for m in self.models:
                 # model_filename = os.path.join(models_dir, '{}_epoch{}.h5'.format(m.name, load_epoch))
                 model_filename = [os.path.join(self.models_dir, mf) for mf in model_files \
-                                  if mf.split('_epoch')[0] == m.name and 'epoch{}'.format(load_epoch) in mf]
+                                  if mf.split('_epoch')[0] == m.name and ('epoch{}_'.format(load_epoch) in mf or 'epoch{}.'.format(load_epoch) in mf)]
                 if len(model_filename) == 0:
                     self.logger.debug(F'Could not find any model files with name {m.name} and epoch {load_epoch}!')
                     model_filename = None

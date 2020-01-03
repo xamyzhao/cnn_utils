@@ -23,11 +23,11 @@ def labels_to_onehot(labels, n_classes=0, label_mapping=None):
     elif n_classes == 0 and label_mapping is not None:
         n_classes = len(label_mapping)
 
-    if labels.shape[-1] == len(label_mapping) and np.max(labels) <= 1. and np.min(labels) >= 0.:
+    if isinstance(labels, np.ndarray) and labels.shape[-1] == len(label_mapping) and np.max(labels) <= 1. and np.min(labels) >= 0.:
         # already onehot
         return labels
 
-    if labels.shape[-1] == 1:
+    if isinstance(labels, np.ndarray) and labels.shape[-1] == 1:
         labels = np.take(labels, 0, axis=-1)
 
     labels = np.asarray(labels)

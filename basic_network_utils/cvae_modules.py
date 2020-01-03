@@ -329,7 +329,6 @@ def transformer_concat_model(conditioning_input_shapes, conditioning_input_names
                              mask_by_conditioning_input_idx=None,
                              unet_nf_enc=None,
                              ):
-
     # collect conditioning inputs, and concatentate them into a stack
     if not isinstance(conditioning_input_shapes, list):
         conditioning_input_shapes = [conditioning_input_shapes]
@@ -346,7 +345,6 @@ def transformer_concat_model(conditioning_input_shapes, conditioning_input_names
         conditioning_input_stack = conditioning_inputs[0]
 
     conditioning_input_shape = tuple(conditioning_input_stack.get_shape().as_list()[1:])
-
     n_dims = len(conditioning_input_shape) - 1
 
     # we will always give z as a flattened vector
@@ -817,7 +815,7 @@ def cvae_tester_wrapper(
         latent_shape,
         dec_model,
         n_outputs=1,
-
+        model_name='cvae_tester_model'
 ):
     # collect conditioning inputs, and concatentate them into a stack
     if not isinstance(conditioning_input_shapes, list):
@@ -837,9 +835,11 @@ def cvae_tester_wrapper(
                         )(z_dummy_input)
     y = dec_model(conditioning_inputs + [z_samp])
     if isinstance(y, list): # multiple outputs, assume the first is the actual transformed frame
-        y = y[0]
+        y = [y[0]] * n_outputs + y[1:]
+    else:
+        y = [y] * n_outputs
 
-    return Model(inputs=conditioning_inputs + [z_dummy_input], outputs=[y] * n_outputs, name='cvae_tester_model')
+    return Model(inputs=conditioning_inputs + [z_dummy_input], outputs=y, name=model_name)
 
 
 def _collect_inputs(ae_input_shapes, ae_input_names,

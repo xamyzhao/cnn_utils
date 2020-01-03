@@ -12,18 +12,22 @@ num_models_to_keep = 8
 num_figs_to_keep = 8
 
 
-def keep_closest_to_milestones(milestone_interval, nums_to_remove):
-    milestone_nums = np.arange(0, max(nums_to_remove)+1, milestone_interval).astype(int)
-
+def keep_closest_to_milestones(milestone_intervals, nums_to_remove):
+    if not isinstance(milestone_intervals, list):
+        milestone_intervals = [milestone_intervals]
     nums_to_keep = []
-    # keep the closest example to each milestone
-    for mn in milestone_nums:
-        dists_from_milestone = np.asarray(nums_to_remove) - mn
-        nums_to_keep.append(nums_to_remove[np.argmin(np.abs(dists_from_milestone))])
-    print('Keeping {}'.format(nums_to_keep))
+
+    for milestone_interval in milestone_intervals:
+        milestone_nums = np.arange(0, max(nums_to_remove)+1, milestone_interval).astype(int)
+
+        # keep the closest example to each milestone
+        for mn in milestone_nums:
+            dists_from_milestone = np.abs(np.asarray(nums_to_remove) - mn)
+            nums_to_keep.append(nums_to_remove[np.argmin(dists_from_milestone)])
+    nums_to_keep = list(sorted(list(set(nums_to_keep))))
+
     nums_to_remove = [n for n in nums_to_remove if n not in nums_to_keep]
-    print('Removing {}'.format(nums_to_remove))
-    return nums_to_remove
+    return nums_to_remove, nums_to_keep
 
 
 def remove_all_but_milestones_and_recent(
@@ -32,6 +36,7 @@ def remove_all_but_milestones_and_recent(
         num_prefix,
         milestone_interval, num_recent_to_keep=3,
         debug=False):
+    # first get all file candidates that we can remove
     files_to_remove = [
         os.path.join(in_dir, f) for f in os.listdir(in_dir)
         if np.any([f.endswith(e) for e in file_exts]) \
@@ -41,16 +46,25 @@ def remove_all_but_milestones_and_recent(
     nums = [int(re.search('(?<={})[0-9]*'.format(num_prefix), os.path.basename(f)).group(0)) for f in files_to_remove]
 
     if (len(nums) > num_recent_to_keep):
-        nums_to_remove = sorted(list(set(nums)))[:-num_recent_to_keep]
+        nums_candidates = sorted(list(set(nums)))[:-num_recent_to_keep]
 
-        if len(nums_to_remove) == 0:
+        if len(nums_candidates) == 0:
             return
-        nums_to_remove = keep_closest_to_milestones(milestone_interval, nums_to_remove)
+        nums_to_remove, nums_to_keep = keep_closest_to_milestones(milestone_interval, nums_candidates)
+        print('Crawling dir {}'.format(in_dir))
+        print('Keeping {} of {} nums: {}'.format(len(nums_to_keep), len(list(set(nums_candidates))), nums_to_keep))
         if len(nums_to_remove) == 0:
+            print('')
             return
+        print('Removing {}'.format(nums_to_remove))
+
 
         files_to_remove = [f for f in files_to_remove if np.any(['{}{}_'.format(num_prefix, ntr) in os.path.basename(
             f) or '{}{}.'.format(num_prefix, ntr) in os.path.basename(f) for ntr in nums_to_remove])]
+
+        if len(files_to_remove) == 0:
+            print('')
+            return
 
         if debug:
             print('[{}] Will remove:'.format(datetime.datetime.now().strftime('%m-%d-%y %H:%M')))
@@ -62,7 +76,7 @@ def remove_all_but_milestones_and_recent(
                 print(f)
                 os.remove(f)
 
-
+        print('')
 exp_root = './experiments'
 if __name__ == '__main__':
     import sys
@@ -77,19 +91,19 @@ if __name__ == '__main__':
     assert 200 not in remove_nums
 
     ap = argparse.ArgumentParser()
-    ap.add_argument('-nd', nargs='?', type=str, help='networks dir', default='./models')
-    ap.add_argument('-od', nargs='?', type=str, help='figures dir', default='./figures')
-    ap.add_argument('-mm', '--models_milestone', nargs='?', type=int,
+    ap.add_argument('-nd', nargs='?', type=str, help='networks dir', default='models')
+    ap.add_argument('-od', nargs='?', type=str, help='figures dir', default='figures')
+    ap.add_argument('-mm', '--models_milestone', nargs='*', type=int,
                     help='save any files with epochs % milestone == 0',
                     default=10)
-    ap.add_argument('-fm', '--figs_milestone', nargs='?', type=int,
+    ap.add_argument('-fm', '--figs_milestone', nargs='*', type=int,
                     help='save any files with epochs % milestone == 0',
                     default=10)
     ap.add_argument('-model_num_prefix', nargs='?', type=str, help='number prefix e.g. epoch, batch, iter',
                     default='epoch')
     ap.add_argument('-fig_num_prefix', nargs='?', type=str, help='number prefix e.g. epoch, batch, iter',
                     default='epoch')
-    ap.add_argument('--debug', action='store_true', help='turn on to see what will be removed without actually removing',
+    ap.add_argument('--debug', '-d', action='store_true', help='turn on to see what will be removed without actually removing',
                     default=False)
     ap.add_argument('-m', action='store_true', help='Boolean to do removal from models dir', default=False,
                     dest='do_remove_models')

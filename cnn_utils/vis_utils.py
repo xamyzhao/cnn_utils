@@ -22,7 +22,7 @@ def label_ims(ims_batch, labels=None,
               clip_flow=10, display_h=128, pad_top=None, clip_norm=None,
               padding_size=0, padding_color=255,
               border_size=0, border_color=0,
-              color_space='rgb', combine_from_axis=0, concat_axis=0):
+              color_space='rgb', combine_from_axis=0, concat_axis=0, interp=cv2.INTER_LINEAR):
     '''
     Displays a batch of matrices as an image.
 
@@ -39,7 +39,7 @@ def label_ims(ims_batch, labels=None,
     :return:
     '''
 
-    if len(ims_batch.shape) == 3 and ims_batch.shape[-1] == 3:
+    if isinstance(ims_batch, np.ndarray) and len(ims_batch.shape) == 3 and ims_batch.shape[-1] == 3:
         # already an image
         return ims_batch
 
@@ -50,13 +50,13 @@ def label_ims(ims_batch, labels=None,
         del all_axes[combine_from_axis]
         ims_batch = np.transpose(ims_batch, (combine_from_axis,) + tuple(all_axes))
 
-    batch_size = ims_batch.shape[0]
-    h = ims_batch.shape[1]
-    w = ims_batch.shape[2]
-    if len(ims_batch.shape) == 3:
+    batch_size = len(ims_batch) # works for lists and np arrays
+    h = ims_batch[0].shape[0]
+    w = ims_batch[0].shape[1]
+    if len(ims_batch[0].shape) == 2:
         n_chans = 1
     else:
-        n_chans = ims_batch.shape[-1]
+        n_chans = ims_batch[0].shape[-1]
 
     if type(labels) == list and len(labels) == 1:  # only label the first image
         labels = labels + [''] * (batch_size - 1)
@@ -165,11 +165,6 @@ def label_ims(ims_batch, labels=None,
             curr_im = ims_batch[i]
 
         # scale to specified display size
-        if scale_factor > 2:  # if we are upsampling by a lot, nearest neighbor can look really noisy
-            interp = cv2.INTER_NEAREST
-        else:
-            interp = cv2.INTER_LINEAR
-
         if not scale_factor == 1:
             curr_im = cv2.resize(curr_im, None, fx=scale_factor, fy=scale_factor, interpolation=interp)
 

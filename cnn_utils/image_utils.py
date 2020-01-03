@@ -10,13 +10,14 @@ def pad_or_crop_to_shape(
         I,
         out_shape,
         border_color=(255, 255, 255)):
+
     if not isinstance(border_color, tuple):
         n_chans = I.shape[-1]
         border_color = tuple([border_color] * n_chans)
 
     # an out_shape with a dimension value of None means just don't crop or pad in that dim
     border_size = [out_shape[d] - I.shape[d] if out_shape[d] is not None else 0 for d in range(2)]
-
+    #print('Padding or cropping with border: {}'.format(border_size))
     if not border_size[0] == 0:
         top_border = abs(int(math.floor(border_size[0] / 2.)))
         bottom_border = abs(int(math.ceil(border_size[0] / 2.)))
@@ -24,9 +25,9 @@ def pad_or_crop_to_shape(
         if border_size[0] > 0:
             # pad with rows on top and bottom
             I = np.concatenate([
-                np.ones((top_border,) + I.shape[1:]) * border_color,
+                np.ones((top_border,) + I.shape[1:], dtype=I.dtype) * border_color,
                 I,
-                np.ones((bottom_border,) + I.shape[1:]) * border_color
+                np.ones((bottom_border,) + I.shape[1:], dtype=I.dtype) * border_color
             ], axis=0)
 
         elif border_size[0] < 0:
@@ -40,9 +41,9 @@ def pad_or_crop_to_shape(
         if border_size[1] > 0:
             # pad with cols on left and right
             I = np.concatenate([
-                np.ones((I.shape[0], left_border) + I.shape[2:]) * border_color,
+                np.ones((I.shape[0], left_border) + I.shape[2:], dtype=I.dtype) * border_color,
                 I,
-                np.ones((I.shape[0], right_border) + I.shape[2:]) * border_color,
+                np.ones((I.shape[0], right_border) + I.shape[2:], dtype=I.dtype) * border_color,
             ], axis=1)
         elif border_size[1] < 0:
             # crop left and right sides

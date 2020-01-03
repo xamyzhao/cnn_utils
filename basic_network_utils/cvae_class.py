@@ -154,7 +154,7 @@ class CVAE(object):
             latent_shape=self.transform_latent_shape,
         )
 
-        self.sampling_model = self.tester_model
+        self._create_sampling_model(n_outputs=self.n_outputs)
         '''
         else:
             self.trainer_model = \
@@ -183,7 +183,8 @@ class CVAE(object):
             conditioning_input_names=self.conditioning_input_names,
             dec_model=self.transformer_model,
             latent_shape=self.transform_latent_shape,
-            n_outputs=n_outputs
+            n_outputs=n_outputs,
+            model_name='cvae_sampling_model'
         )
 
     def get_models(self):

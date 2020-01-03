@@ -110,11 +110,16 @@ class AreaDistributionLoss(object):
 
 def norm_vgg(x):
     import tensorflow as tf
+    eps = 1e-10
     x_norm = tf.sqrt(tf.reduce_sum(x * x, axis=-1, keep_dims=True))
-    x_norm = tf.divide(x, x_norm)
+    x_norm = tf.divide(x, x_norm + eps)
     return x_norm
 
+# used for mode 'caffe'
 keras_imagenet_mean = [103.939, 116.779, 123.68]
+
+keras_imagenet_mean_torch = [0.485, 0.456, 0.406]
+keras_imagenet_std_torch = [0.229, 0.224, 0.225]
 # truncated vgg implementation from guha
 def vgg_preprocess(arg):
     import tensorflow as tf
@@ -126,28 +131,44 @@ def vgg_preprocess(arg):
 
 def vgg_preprocess_norm(arg):
     import tensorflow as tf
-    z = tf.clip_by_value(arg, -1., 1.)
-    z = 255.0 * (z * 0.5 + 0.5)
+    #z = tf.clip_by_value(arg, -1., 1.)
+    z = 255.0 * (arg * 0.5 + 0.5)
     b = z[:, :, :, 0] - 103.939
     g = z[:, :, :, 1] - 116.779
     r = z[:, :, :, 2] - 123.68
     return tf.stack([b, g, r], axis=3)
 
+def vgg_preprocess_torch(arg):
+    import tensorflow as tf
+    #z = tf.clip_by_value(arg, -1., 1.)
+    z = z * 0.5 + 0.5
+    b = (z[:, :, :, 0] - 0.406) / 0.225
+    g = (z[:, :, :, 1] - 0.456) / 0.224
+    r = (z[:, :, :, 2] - 0.485) / 0.229
+    return tf.stack([r, g, b], axis=3)
+
 from keras.applications.vgg16 import VGG16
 from keras.applications.vgg19 import VGG19
 from keras.layers import AveragePooling2D, Conv2D, Input, MaxPooling2D
 from keras.models import Model, load_model
-def vgg_isola_norm(shape=(64,64,3), normalized_inputs=False):
+def vgg_isola_norm(shape=(64,64,3), normalized_inputs=False, do_preprocess=True):
     img_input = Input(shape=shape)
 
-    if normalized_inputs:
-        vgg_model_file = '../evolving_wilds/cnn_utils/vgg16_normtanh_ims{}-{}.h5'.format(shape[0], shape[1])
-        img = Lambda(vgg_preprocess_norm,
-            name='lambda_preproc_norm-11')(img_input)
+    if do_preprocess:
+        if normalized_inputs:
+            #vgg_model_file = '../evolving_wilds/cnn_utils/vgg16_normtorchtanh_ims{}-{}.h5'.format(shape[0], shape[1])
+            #img = Lambda(vgg_preprocess_torch,
+            #    name='lambda_preproc_torchnorm-11')(img_input)
+            vgg_model_file = '../evolving_wilds/cnn_utils/vgg16_normtanh_ims{}-{}.h5'.format(shape[0], shape[1])
+            img = Lambda(vgg_preprocess_norm,
+                name='lambda_preproc_norm-11')(img_input)
+        else:
+            vgg_model_file = '../evolving_wilds/cnn_utils/vgg16_01_ims{}-{}.h5'.format(shape[0], shape[1])
+            img = Lambda(vgg_preprocess,
+                name='lambda_preproc_clip01')(img_input)
     else:
-        vgg_model_file = '../evolving_wilds/cnn_utils/vgg16_01_ims{}-{}.h5'.format(shape[0], shape[1])
-        img = Lambda(vgg_preprocess,
-            name='lambda_preproc_clip01')(img_input)
+        vgg_model_file = '../evolving_wilds/cnn_utils/vgg16_ims{}-{}.h5'.format(shape[0], shape[1])
+        img = img_input
 
     if os.path.isfile(vgg_model_file):
         print('Loading vgg model from {}'.format(vgg_model_file))
@@ -160,7 +181,7 @@ def vgg_isola_norm(shape=(64,64,3), normalized_inputs=False):
     x1 = Conv2D(64, (3, 3),
                       activation='relu',
                       padding='same',
-                      name='block1_conv1')(img_input)
+                      name='block1_conv1')(img)
     x2 = Conv2D(64, (3, 3),
                       activation='relu',
                       padding='same',
@@ -221,9 +242,6 @@ def vgg_isola_norm(shape=(64,64,3), normalized_inputs=False):
                       activation='relu',
                       padding='same',
                       name='block5_conv3')(x16) # relu is layer 30
-
-    #img = Lambda(lambda arg:vgg_preprocess(arg, normalized=normalized_inputs),
-    #    name='lambda_preproc_norm{}'.format(normalized_inputs))(img_input)
 
     # isola implementation uses layer outputs 4, 9, 16, 23, 30, but need to count activations
     model = Model(inputs=[img_input], outputs=[x2, x5, x9, x13, x17])
@@ -314,8 +332,9 @@ def vgg_norm(shape=(64,64,3), normalized_inputs=False):
 #from networks import transform_network_utils
 from keras.layers import Lambda
 class VggFeatLoss(object):
-    def __init__(self, feat_net):
+    def __init__(self, feat_net, dist='l2'):
         self.feat_net = feat_net
+        self.dist = dist
 
     def compute_loss(self, y_true, y_pred):
         import tensorflow as tf
@@ -341,7 +360,10 @@ class VggFeatLoss(object):
 
             hw = tf.shape(x1_l)[1] * tf.shape(x1_l)[2]
 
-            d = tf.reduce_sum(tf.square(x1_l_norm - x2_l_norm), [1, 2, 3])  # bx1
+            if self.dist == 'l1':
+                d = tf.reduce_sum(tf.abs(x1_l_norm - x2_l_norm), [1, 2, 3])  # bx1
+            else:
+                d = tf.reduce_sum(tf.square(x1_l_norm - x2_l_norm), [1, 2, 3])  # bx1
             d_mean = tf.divide(d, tf.cast(hw, tf.float32))
 
             if li == 0:
@@ -655,6 +677,7 @@ class TimeSliceLoss(object):
 class TimeSummedLoss(object):
     def __init__(self, loss_fn, weights_output=None,
                      time_axis=-2, compute_mean=True, pad_amt=None,
+                    do_reshape_to=None,
                      compute_over_frame_idxs=None,
                      ):
         self.time_axis = time_axis
@@ -663,8 +686,13 @@ class TimeSummedLoss(object):
         self.compute_mean = compute_mean    
         self.pad_amt = pad_amt
         self.include_frames = compute_over_frame_idxs
+        self.do_reshape_to = do_reshape_to
 
     def compute_loss(self, y_true, y_pred):
+        if self.do_reshape_to is not None: # reshape a flattened video
+            y_true = tf.reshape(y_true, [-1] + list(self.do_reshape_to))
+            y_pred = tf.reshape(y_pred, [-1] + list(self.do_reshape_to))
+
         if self.pad_amt is not None:
             y_true = tf.pad(y_true, paddings=self.pad_amt, constant_values=1.)
             y_pred = tf.pad(y_pred, paddings=self.pad_amt, constant_values=1.)
