@@ -283,6 +283,21 @@ def label_ims(ims_batch, labels=None,
         out_im = np.split(out_im, batch_size, axis=combine_from_axis)
     return out_im
 
+def concatenate_with_borders(ims_list, axis=None, padding_size=5, pad_val=1.):
+    n_ims = len(ims_list)
+
+    if axis == 0:
+        border_block = np.ones((padding_size,) +  ims_list[0].shape[1:]) * pad_val
+    elif axis == 1:
+        border_block = np.ones((ims_list[0].shape[0], padding_size) + ims_list[0].shape[2:]) * pad_val
+    else:
+        raise Exception('Axes other than 0 or 1 not supported!')
+    border_blocks_list = [border_block] * (n_ims - 1)
+
+    ims_with_borders_list = [None] * (n_ims * 2 + 1)
+    ims_with_borders_list[::2] = ims_list
+    ims_with_borders_list[1::2] = border_blocks_list
+
 def concatenate_with_pad(ims_list, pad_to_im_idx=None, axis=None, pad_val=0.):
     padded_ims_list = pad_images_to_size(ims_list, pad_to_im_idx, ignore_axes=axis, pad_val=pad_val)
     return np.concatenate(padded_ims_list, axis=axis)
